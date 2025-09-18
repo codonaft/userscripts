@@ -1,5 +1,7 @@
 // ==UserScript==
 // @name Improve Video Quality Search
+// @version 0.1
+// @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @match https://xhamster.com/
 // @match https://xhamster.com/search/*
 // @match https://xhamster.com/categories/*

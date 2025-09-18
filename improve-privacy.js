@@ -1,5 +1,7 @@
 // ==UserScript==
 // @name Improve Privacy
+// @version 0.1
+// @downloadURL https://userscripts.codonaft.com/improve-privacy.js
 // ==/UserScript==
 
 (function() {

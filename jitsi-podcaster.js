@@ -1,5 +1,8 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
+// @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
+// @version 0.1
+// @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.js
 // @match https://*.jitsi-meet.*/*
 // @match https://*.jitsi.*/*
 // @match https://*.meet.switch.ch/*
@@ -72,7 +75,6 @@
 // @match https://virtual.chaosdorf.space/*
 // @match https://webmeeting.opensolution.it/*
 // @match https://www.kuketz-meet.de/*
-// @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
 // ==/UserScript==
 
 (function() {

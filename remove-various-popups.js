@@ -1,5 +1,7 @@
 // ==UserScript==
 // @name Remove Various Popups
+// @version 0.1
+// @downloadURL https://userscripts.codonaft.com/remove-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
 // @match https://chatgpt.com/*

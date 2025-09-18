@@ -1,5 +1,7 @@
 // ==UserScript==
 // @name Skip Video Intros
+// @version 0.1
+// @downloadURL https://userscripts.codonaft.com/skip-video-intros.js
 // @match https://www.pornhub.com/view_video.php*
 // ==/UserScript==
 
