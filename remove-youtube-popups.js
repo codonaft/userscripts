@@ -13,37 +13,44 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  const closeBanner = setInterval(function() {
-    if (document.getElementsByClassName('yt-spec-button-shape-next').length > 0) {
+  const process = (node, observer) => {
+    if (node.nodeType !== 1) return;
+
+    if (node.classList.contains('yt-spec-button-shape-next')) {
       setTimeout(function() {
-        [...document.getElementsByClassName('yt-spec-button-shape-next')].forEach(i => {
-          const label = i.getAttribute('aria-label');
-          if (label && label.includes('No thanks')) {
+        if (node.getAttribute('aria-label')?.includes('No thanks')) {
+          node.click();
+        }
+      }, randomPause());
+      observer.disconnect();
+      return;
+    } else if (node.classList.contains('ytd-single-option-survey-renderer')) {
+      setTimeout(function() {
+        if (node.getAttribute('icon')?.includes('yt-icons:close')) {
+          node.click();
+        }
+      }, randomPause());
+      return;
+    } else if (node.tagName === 'DIV' && node.textContent.includes('My Ad Center')) {
+      setTimeout(function() {
+        node.querySelectorAll('button').forEach(i => {
+          if (i.getAttribute('aria-label')?.includes('Close')) {
             i.click();
           }
         });
-        clearInterval(closeBanner);
       }, randomPause());
-    } else if ([...document.querySelectorAll('div')].filter(i => i.textContent.includes('My Ad Center')).length > 0) {
-      setTimeout(function() {
-        document.querySelectorAll('button').forEach(i => {
-          const label = i.getAttribute('aria-label');
-          if (label && label.includes('Close')) {
-            i.click();
-          }
-        });
-        clearInterval(closeBanner);
-      }, randomPause());
-    } else if (document.getElementsByClassName('ytd-single-option-survey-renderer').length > 0) {
-      setTimeout(function() {
-        [...document.getElementsByClassName('ytd-single-option-survey-renderer')].forEach(i => {
-          const label = i.getAttribute('icon');
-          if (label && label.includes('yt-icons:close')) {
-            i.click();
-          }
-        })
-        clearInterval(closeBanner);
-      }, randomPause());
+      observer.disconnect();
+      return;
     }
-  }, 300);
+
+    node.childNodes.forEach(n => process(n, observer));
+  };
+
+  const onChange = (node, f) => {
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => process(n, observer))));
+    observer.observe(node, { childList: true, subtree: true });
+    f(node, observer);
+  };
+
+  onChange(document.body, process);
 })();

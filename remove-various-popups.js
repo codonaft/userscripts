@@ -16,40 +16,41 @@
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
-  const closeBanner = setInterval(function() {
-    if (document.querySelectorAll('div[role=dialog]').length > 0) {
+  const process = (node, observer) => {
+    if (node.nodeType !== 1) return;
+
+    if (node.matches?.('div[role=dialog]')) {
       setTimeout(function() {
-        document.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
-        document.querySelectorAll('button.btn').forEach(i => {
+        node.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
+        node.querySelectorAll('button.btn').forEach(i => {
           if (i.innerText.includes('Not now')) {
             i.click();
           }
         });
-        clearInterval(closeBanner);
       }, randomPause());
+      observer.disconnect();
+      return;
+    } else if (['A', 'BUTTON'].includes(node.tagName) && node.innerText.includes('Stay logged out')) {
+      node.click();
+      return;
+    } else if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent.includes('Continue without disabling')) {
+      observer.disconnect();
+      node.parentElement.click();
+      return;
+    } else if (node.matches?.('#cookieconsentwarningcontainer, #donate_banner')) {
+      observer.disconnect();
+      node.parentNode?.removeChild(node);
+      return;
     }
 
-    ['a', 'button'].flatMap(i => [...document.querySelectorAll(i)]).forEach(i => {
-      if (i.innerText.includes('Stay logged out')) {
-        i.click();
-        clearInterval(closeBanner);
-      }
-    });
+    node.childNodes.forEach(n => process(n, observer));
+  };
 
-    [
-      ...document.querySelectorAll('#cookieconsentwarningcontainer'),
-      ...document.querySelectorAll('#donate_banner'),
-    ].forEach(i => {
-      i.parentNode.removeChild(i);
-      clearInterval(closeBanner);
-    });
+  const onChange = (node, f) => {
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => process(n, observer))));
+    observer.observe(node, { childList: true, subtree: true });
+    f(node, observer);
+  };
 
-    {
-      const span = [...document.querySelectorAll('span')].find(span => span.textContent.includes('Continue without disabling'));
-      if (span && span.parentElement && span.parentElement.tagName.toLowerCase() === 'button') {
-        span.parentElement.click();
-        clearInterval(closeBanner);
-      }
-    }
-  }, 300);
+  onChange(document.body, process);
 })();

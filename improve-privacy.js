@@ -3,19 +3,44 @@
 // ==/UserScript==
 
 (function() {
-  "use strict";
+  'use strict';
 
-  setInterval(function() {
-    document.querySelectorAll('span.style-scope.ytd-topbar-logo-renderer').forEach(i => i.style.display = 'none');
+  const cleanup = node => {
+    if (node.tagName !== 'A') return;
 
-    document.querySelectorAll('a').forEach(i => {
-      if (i.href.startsWith('https://www.youtube.com/watch?') || i.href.startsWith('https://youtu.be/')) {
-        const url = new URL(i.href);
-        [...url.searchParams.keys()]
-          .filter(k => k !== 'v')
-          .forEach(k => url.searchParams.delete(k));
-        i.href = url.toString();
-      }
-    });
-  }, 1000);
+    const href = node.href;
+    if (!href.startsWith('https://www.youtube.com/watch?') && !href.startsWith('https://youtu.be/')) return;
+
+    const url = new URL(href);
+    [...url.searchParams.keys()]
+      .filter(k => k !== 'v')
+      .forEach(k => url.searchParams.delete(k));
+
+    const newHref = url.toString();
+    if (newHref !== href) {
+      node.href = newHref;
+    }
+  };
+
+  const process = node => {
+    if (node.nodeType !== 1) return;
+
+    if (node.matches?.('span.style-scope.ytd-topbar-logo-renderer')) {
+      node.style.display = 'none';
+      return;
+    }
+
+    if (node.tagName === 'A') {
+      cleanup(node);
+    }
+    node.childNodes.forEach(process);
+  };
+
+  const onChange = (node, f) => {
+    f(node);
+    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(process)))
+      .observe(node, { childList: true, subtree: true });
+  };
+
+  onChange(document.body, process);
 })();
