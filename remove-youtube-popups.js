@@ -48,11 +48,11 @@
     node.childNodes.forEach(n => process(n, observer));
   };
 
-  const onChange = (node, f) => {
+  const subscribeOnChanges = (node, f) => {
     const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => process(n, observer))));
     observer.observe(node, { childList: true, subtree: true });
     f(node, observer);
   };
 
-  onChange(document.body, process);
+  subscribeOnChanges(document.body, process);
 })();
