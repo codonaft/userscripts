@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name Improve Video Quality Search
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
 // @match https://www.pornhub.com/categories/*
 // @match https://www.pornhub.com/video
 // @match https://www.pornhub.com/video/search
+// @match https://www.porntrex.com/categories/*/
+// @match https://www.porntrex.com/channels/*/
+// @match https://www.porntrex.com/models/*/
+// @match https://www.porntrex.com/top-rated/
 // @match https://www.xvideos.com/
 // @match https://www.xvideos.com/c/*
 // @match https://xhamster.com/
@@ -56,6 +60,17 @@
    } else if (url.host === 'spankbang.com' && !(url.searchParams.has('q') && url.searchParams.has('d'))) {
      url.searchParams.set('q', 'fhd');
      url.searchParams.set('d', '20');
+     newUrl = url.toString();
+   } else if (url.host === 'www.porntrex.com' && !p.includes('/hd/top-rated/thirty-all-min/')) {
+     const ps = p.split('/').filter(i => i.length > 0);
+     for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
+       if (!ps.includes(i)) {
+         ps.push(i);
+       }
+     }
+     ps.push('');
+     ps.unshift('');
+     url.pathname = ps.join('/');
      newUrl = url.toString();
    }
 
