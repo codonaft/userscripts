@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Video Quality Search
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -57,7 +57,10 @@
          newUrl = url.toString();
        }
      }
-   } else if (url.host === 'spankbang.com' && !(url.searchParams.has('q') && url.searchParams.has('d'))) {
+   } else if (url.host === 'spankbang.com' && !url.pathname.endsWith('/tags') && !url.pathname.includes('/playlist/') && !(url.searchParams.has('q') && url.searchParams.has('d'))) {
+     if (url.pathname === '/') {
+       url.pathname = '/trending_videos/'
+     }
      url.searchParams.set('q', 'fhd');
      url.searchParams.set('d', '20');
      newUrl = url.toString();
