@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -13,8 +13,24 @@
   const process = (node, observer) => {
     if (node.nodeType !== 1 || node.tagName !== 'BUTTON' || !node.classList.contains('ytp-play-button') || node.getAttribute('data-title-no-tooltip') === 'Play') return;
 
-    node.click();
     observer.disconnect();
+    node.click();
+
+    const div = node.closest('div.html5-video-player');
+    const videoId = div?.querySelector('a.ytp-title-link')?.getAttribute('href')?.split('?v=')[1];
+    if (videoId) {
+      const image = document.createElement('img');
+      image.src = `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`;
+      image.style.width = '100%';
+      image.style.height = 'auto';
+      image.style.display = 'block';
+
+      const link = document.createElement('a');
+      link.href = `https://www.youtube.com/watch?v=${videoId}`;
+      link.appendChild(image);
+
+      div?.parentNode.replaceChild(link, div);
+    }
   };
 
   const subscribeOnChanges = (node, f) => {
