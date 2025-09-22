@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name Remove Pseudocensorship
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.js
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
   const process = node => {

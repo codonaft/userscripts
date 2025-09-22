@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
   const process = (node, observer) => {

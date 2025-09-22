@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name Skip Video Intros
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/skip-video-intros.js
 // @match https://www.pornhub.com/view_video.php*
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
    function random() {

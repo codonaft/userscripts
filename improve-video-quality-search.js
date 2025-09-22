@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Video Quality Search
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -19,12 +19,12 @@
 // @match https://xhamster.com/search/*
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
    const url = new URL(window.location.href);
    const p = url.pathname;
-   let newUrl = undefined;
+   let newUrl ;
 
    if (url.host === 'xhamster.com') {
      if (p.startsWith('/search/')) {
@@ -35,10 +35,10 @@
        }
      } else if (p.startsWith('/categories/') || p.startsWith('/channels/')) {
        if (!p.includes('/hd/')) {
-         newUrl = url.toString() + '/hd/full-length/best?quality=1080p';
+         newUrl = `${url.toString()}/hd/full-length/best?quality=1080p`;
        }
      } else if (p === '/') {
-       newUrl = url.toString() + '/hd/full-length/best/monthly?quality=1080p';
+       newUrl = `${url.toString()}/hd/full-length/best/monthly?quality=1080p`;
      }
    } else if (url.host === 'www.pornhub.com' && url.searchParams.get('hd') !== '1' && !url.searchParams.has('min_duration') && (p.startsWith('/categories/') || p.startsWith('/video') || p.startsWith('/search'))) {
      url.searchParams.set('min_duration', 20);
@@ -53,7 +53,7 @@
      } else if (p.startsWith('/c/') && !p.includes('q:1080P')) {
        const ps = p.split('/');
        if (ps.length >= 3) {
-         url.pathname = ps[1] + '/s:rating/d:20min_more/q:1080P/' + ps[2];
+         url.pathname = `${ps[1]}/s:rating/d:20min_more/q:1080P/${ps[2]}`;
          newUrl = url.toString();
        }
      }

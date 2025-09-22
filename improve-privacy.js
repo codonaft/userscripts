@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.js
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
   const cleanup = node => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.js
 // @match https://*.jitsi-meet.*/*
 // @match https://*.jitsi.*/*
@@ -77,7 +77,7 @@
 // @match https://www.kuketz-meet.de/*
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
   const hide = node => node.style.display = 'none';

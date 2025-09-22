@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Remove Various Popups
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/remove-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -9,7 +9,7 @@
 // @match https://www.cvedetails.com/*
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
   function randomPause() {
@@ -22,7 +22,7 @@
     if (node.nodeType !== 1) return;
 
     if (node.matches?.('div[role=dialog]')) {
-      setTimeout(function() {
+      setTimeout(() => {
         node.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
         node.querySelectorAll('button.btn').forEach(i => {
           if (i.innerText.includes('Not now')) {

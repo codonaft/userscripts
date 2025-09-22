@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name Force Browser Language
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/force-browser-language.js
 // @match https://*.google.com/*
 // ==/UserScript==
 
-(function() {
+(() => {
   'use strict';
 
    const lang = navigator.language || 'en';
