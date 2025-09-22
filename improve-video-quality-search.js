@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Video Quality Search
-// @version 0.4
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -40,7 +40,7 @@
      } else if (p === '/') {
        newUrl = url.toString() + '/hd/full-length/best/monthly?quality=1080p';
      }
-   } else if (url.host === 'www.pornhub.com' && url.searchParams.get('hd') !== '1' && (p.startsWith('/categories/') || p.startsWith('/video') || p.startsWith('/search'))) {
+   } else if (url.host === 'www.pornhub.com' && url.searchParams.get('hd') !== '1' && !url.searchParams.has('min_duration') && (p.startsWith('/categories/') || p.startsWith('/video') || p.startsWith('/search'))) {
      url.searchParams.set('min_duration', 20);
      url.searchParams.set('hd', 1);
      newUrl = url.toString();
