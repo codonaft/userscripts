@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.js
 // @match https://*.jitsi-meet.*/*
 // @match https://*.jitsi.*/*
@@ -85,7 +85,7 @@
   const process = node => {
     if (node.nodeType !== 1) return;
 
-    if (node.matches?.('div.details-container, a.watermark.leftwatermark[href="https://jitsi.org"]')) {
+    if (node.matches?.('div.details-container, div.bottom-indicators, a.watermark.leftwatermark[href="https://jitsi.org"]')) {
       hide(node);
       return;
     }
