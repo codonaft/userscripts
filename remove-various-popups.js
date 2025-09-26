@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Remove Various Popups
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/remove-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -12,14 +12,15 @@
 (() => {
   'use strict';
 
-  function randomPause() {
-    const min = 1000;
-    const max = 1500;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
+  const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
   const process = (node, observer) => {
     if (node.nodeType !== 1) return;
+
+    if (['A', 'BUTTON'].includes(node.tagName) && node.innerText.includes('Stay logged out')) {
+      setTimeout(() => node.click(), randomPause(1000, 1500));
+      return;
+    }
 
     if (node.matches?.('div[role=dialog]')) {
       setTimeout(() => {
@@ -29,17 +30,18 @@
             i.click();
           }
         });
-      }, randomPause());
+      }, randomPause(1000, 1500));
       observer.disconnect();
       return;
-    } else if (['A', 'BUTTON'].includes(node.tagName) && node.innerText.includes('Stay logged out')) {
-      node.click();
-      return;
-    } else if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent.includes('Continue without disabling')) {
+    }
+
+    if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent.includes('Continue without disabling')) {
       observer.disconnect();
       node.parentElement.click();
       return;
-    } else if (node.matches?.('#cookieconsentwarningcontainer, #donate_banner')) {
+    }
+
+    if (node.matches?.('#cookieconsentwarningcontainer, #donate_banner')) {
       observer.disconnect();
       node.parentNode?.removeChild(node);
       return;
