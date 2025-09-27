@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Skip Video Intros
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/skip-video-intros.js
 // @match https://www.pornhub.com/view_video.php*
 // ==/UserScript==
@@ -18,7 +18,7 @@
   const redirect = (min, max) => {
     window.stop();
     params.set('t', random(Math.floor(min), Math.floor(max)));
-    window.location.href = url.toString();
+    window.location.replace(url.toString());
   };
 
   if (params.has('t')) {
@@ -30,7 +30,7 @@
             redirect(duration / 4, duration / 2);
           }
         } else {
-          window.location.href = url.toString();
+          window.location.replace(url.toString());
         }
       },
       random(2500, 3000))

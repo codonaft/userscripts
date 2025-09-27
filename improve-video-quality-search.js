@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Video Quality Search
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -79,6 +79,6 @@
 
    if (newUrl) {
      window.stop();
-     window.location.href = newUrl;
+     window.location.replace(newUrl);
    }
 })()
