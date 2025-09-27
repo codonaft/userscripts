@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -9,6 +9,8 @@
 
 (() => {
   'use strict';
+
+  if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
   const process = (node, observer) => {
     if (node.nodeType !== 1 || node.tagName !== 'BUTTON' || !node.classList.contains('ytp-play-button') || node.getAttribute('data-title-no-tooltip') === 'Play') return;

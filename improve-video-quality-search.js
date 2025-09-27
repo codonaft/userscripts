@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Video Quality Search
-// @version 0.7
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/improve-video-quality-search.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -21,6 +21,8 @@
 
 (() => {
   'use strict';
+
+   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
    const url = new URL(window.location.href);
    const p = url.pathname;

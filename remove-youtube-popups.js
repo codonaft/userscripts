@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Remove YouTube Popups
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/remove-youtube-popups.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
@@ -9,11 +9,13 @@
 (() => {
   'use strict';
 
-  function randomPause() {
+  if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
+
+  const randomPause = () => {
     const min = 3000;
     const max = 5000;
     return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
+  };
 
   const process = (node, observer) => {
     if (node.nodeType !== 1) return;

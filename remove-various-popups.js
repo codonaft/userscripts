@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Remove Various Popups
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/remove-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -11,6 +11,8 @@
 
 (() => {
   'use strict';
+
+  if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
   const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
