@@ -1,12 +1,14 @@
 // ==UserScript==
-// @name Remove Various Popups
-// @version 0.4
-// @downloadURL https://userscripts.codonaft.com/remove-various-popups.js
+// @name Bypass Various Popups
+// @version 0.1
+// @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
 // @match https://chatgpt.com/*
 // @match https://pmvhaven.com/*
 // @match https://www.cvedetails.com/*
+// @match https://www.pornhub.com/*
+// @match https://xhamster.com/*
 // ==/UserScript==
 
 (() => {
@@ -43,9 +45,25 @@
       return;
     }
 
+    if (node.matches?.('div#credential_picker_container')) {
+      node.style.display = 'none'
+      return;
+    }
+
+    if (node.tagName === 'BUTTON' && node.getAttribute('data-role') === 'parental-control-confirm-button') {
+      node.click();
+      return;
+    }
+
     if (node.matches?.('#cookieconsentwarningcontainer, #donate_banner')) {
       observer.disconnect();
       node.parentNode?.removeChild(node);
+      return;
+    }
+
+    if (node.matches?.('#modalWrapMTubes')) {
+      observer.disconnect();
+      document.body.querySelectorAll('#modalWrapMTubes > div > div > button').forEach(i => i.click());
       return;
     }
 

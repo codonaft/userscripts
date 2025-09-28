@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name SearXNG Redirect On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/searxng-redirect-on-failure.js
 // ==/UserScript==
 
@@ -11,7 +11,7 @@
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
   if (!document.head.querySelector('link[title="SearXNG"][type="application/opensearchdescription+xml"]')) return;
 
-  if (!document.querySelector('td.response-time') && document.querySelector('td.response-error')) {
+  if (!document.body.querySelector('td.response-time') && document.body.querySelector('td.response-error')) {
     const url = new URL(window.location.href);
     if (url.host.endsWith('.onion')) {
       url.host = 'codonaftbvv4j5k7nsrdivbdblycqrng5ls2qkng6lm77svepqjyxgid.onion';
