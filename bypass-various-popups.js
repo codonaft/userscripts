@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -51,7 +51,7 @@
     }
 
     if (node.tagName === 'BUTTON' && node.getAttribute('data-role') === 'parental-control-confirm-button') {
-      node.click();
+      setTimeout(() => node.click(), randomPause(1000, 1500));
       return;
     }
 
@@ -63,7 +63,9 @@
 
     if (node.matches?.('#modalWrapMTubes')) {
       observer.disconnect();
-      document.body.querySelectorAll('#modalWrapMTubes > div > div > button').forEach(i => i.click());
+      setTimeout(() => {
+        document.body.querySelectorAll('#modalWrapMTubes > div > div > button').forEach(i => i.click());
+      }, randomPause(1000, 1500));
       return;
     }
 
