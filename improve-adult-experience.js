@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set best quality and duration filters by default, make unrelated video previews transparent
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -47,9 +47,8 @@
         link.href += `&t=${t}`;
       }
 
-      // TODO: check quality
-      if (duration < 20 * 60) {
-        const div = i.closest('a').closest('div.phimage')?.parentNode;
+      if (duration < 20 * 60) { // TODO: check quality
+        const div = i.closest('a').closest('div.phimage')?.parentNode; // TODO: initially hide all of them?
         if (div) {
           div.style.opacity = '0';
           div.addEventListener('mouseenter', () => div.style.opacity = '15%'); // TODO: pure css?
@@ -67,7 +66,7 @@
               redirect(duration / 4, duration / 2);
             }
           } else {
-            window.location.replace(url.toString());
+            console.log('slow CDN?');
           }
         },
         random(2500, 3000))
