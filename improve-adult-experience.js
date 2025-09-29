@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set best quality and duration filters by default, make unrelated video previews transparent
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -33,45 +33,75 @@
   const pornhub = () => {
     // TODO: never redirect, just update the URLs
 
-    const redirect = (min, max) => {
-      window.stop();
-      params.set('t', random(Math.floor(min), Math.floor(max)));
-      window.location.replace(url.toString());
+    const processEmbedded = document => {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.mgp_eventCatcher { display: none !important; }
+        div.mgp_topBar { display: none !important; }
+        div.mgp_thumbnailsGrid { display: none !important; }
+        img.mgp_pornhub { display: none !important; }
+      `;
+      document.body.appendChild(style);
+      const video = document.body.querySelector('video');
+      video?.addEventListener('loadedmetadata', _ => video.currentTime = random(video.duration / 4, video.duration / 3));
     };
+
+    const style = document.createElement('style');
+    style.innerHTML = `
+      div.unrelatedcontent { opacity: 10%; }
+      div.unrelatedcontent:hover { opacity: 40%; }
+    `;
+    document.querySelector('div#main-container')?.appendChild(style);
 
     [...document.body.querySelectorAll('var.duration')].forEach(i => {
       const duration = timeToSeconds(i.innerText);
-      const t = random(Math.floor(duration / 4), Math.floor(duration / 2));
+      const t = random(Math.floor(duration / 4), Math.floor(duration / 3));
       const link = i.closest('a');
       if (link) {
         link.href += `&t=${t}`;
       }
 
+      const div = i.closest('a').closest('div.phimage')?.parentNode;
       if (duration < 20 * 60) { // TODO: check quality
-        const div = i.closest('a').closest('div.phimage')?.parentNode; // TODO: initially hide all of them?
-        if (div) {
-          div.style.opacity = '0';
-          div.addEventListener('mouseenter', () => div.style.opacity = '15%'); // TODO: pure css?
-          div.addEventListener('mouseleave', () => div.style.opacity = '0');
-        }
+        div?.classList.add('unrelatedcontent');
       }
     });
 
-    if (p === '/view_video.php') {
-      if (params.has('t')) {
-        setTimeout(() => {
-          const duration = timeToSeconds(document.body.querySelector('span.mgp_total')?.innerText);
-          if (duration) {
-            if (Number(params.get('t')) >= duration) {
-              redirect(duration / 4, duration / 2);
-            }
-          } else {
-            console.log('slow CDN?');
-          }
-        },
-        random(2500, 3000))
+    if (p.startsWith('/embed/')) {
+      // happens for both iframed and redirected embedded player here
+      console.log('processing embed');
+      processEmbedded(document); // document is a part of iframe here
+    } else if (p === '/view_video.php') {
+      const durationFromNormalPlayer = timeToSeconds(document.body.querySelector('span.mgp_total')?.innerText);
+      if (durationFromNormalPlayer) {
+        if (!params.has('t') || Number(params.get('t')) >= durationFromNormalPlayer) {
+          window.stop();
+          params.set('t', random(Math.floor(durationFromNormalPlayer / 4), Math.floor(durationFromNormalPlayer / 3)));
+          window.location.replace(url.toString());
+        }
       } else {
-        redirect(120, 200);
+        console.log('fallback to embedded player');
+        const embedUrl = `https://www.pornhub.com/embed/${params.get('viewkey')}`;
+        const container = document.body.querySelector('div.playerFlvContainer');
+        if (container) {
+          const iframe = document.createElement('iframe');
+          /*iframe.onload = () => {
+            console.log('iframe onload');
+            processEmbedded(iframe.contentWindow.document);
+          };*/
+          iframe.referrerpolicy = 'no-referrer';
+          iframe.width = '100%';
+          iframe.height = '100%';
+          iframe.frameborder = '0';
+          iframe.scrolling = 'no';
+          iframe.allowfullscreen = '';
+          iframe.src = embedUrl;
+          container.appendChild(iframe);
+        } else {
+          console.log('redirecting to embedded player');
+          window.stop();
+          window.location.href = embedUrl;
+        }
       }
     } else if (params.get('hd') !== '1' && !params.has('min_duration') && (p.startsWith('/categories/') || p === '/video' || p === '/video/search')) {
       params.set('min_duration', 20);
