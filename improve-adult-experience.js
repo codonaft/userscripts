@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set best quality and duration filters by default, make unrelated video previews transparent
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -28,7 +28,7 @@
 
   const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 
-  const timeToSeconds = time => (time || '').split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
+  const timeToSeconds = time => (time || '').trim().split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 
   const simulateClick = (document, node) => {
     console.log('simulateClick');
@@ -43,24 +43,55 @@
   const pornhub = _ => {
     // TODO: never redirect, just update the URLs
 
-    const processEmbedded = document => {
-      const style = document.createElement('style');
-      style.innerHTML = `
+    const processEmbedded = (document, similarVideos) => {
+      const css = `
         div.mgp_topBar { display: none !important; }
         div.mgp_thumbnailsGrid { display: none !important; }
         img.mgp_pornhub { display: none !important; }
       `;
+      const styleApplied = [...document.body.querySelectorAll('style')]
+        .filter(i => i.innerHTML === css)
+        .length > 0;
+      if (styleApplied) {
+        console.log('embedded video is already initialized');
+        return;
+      }
+      console.log('applying style');
+      const style = document.createElement('style');
+      style.innerHTML = css;
       document.body.appendChild(style);
 
-      const video = document.body.querySelector('video');
-      if (!video) return;
+      const requiresRefresh = document.body.querySelector('div.mgp_errorIcon') &&
+        document.body.querySelector('p')?.textContent.includes('Please refresh the page');
+      if (requiresRefresh) {
+        console.log('refreshing after error');
+        window.location.href = window.location.href;
+      }
 
-      video.addEventListener('loadstart', _ => simulateClick(document, document.querySelector('div.mgp_playIcon')));
-      video.addEventListener('loadedmetadata', _ => video.currentTime = random(video.duration / 4, video.duration / 3));
-      document.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
+      const video = document.body.querySelector('video');
+      if (!video) {
+        console.log('embedding this video is probably not allowed');
+        window.stop();
+        // window.parent.location = window.parent.location; // TODO: do this no more than once during 5 mins for a given video?
+        if (similarVideos.length > 0) {
+          console.log('redirecting to random non-boring similar video');
+          // TODO: use non-watched videos as priority?
+          window.location.href = similarVideos[random(0, similarVideos.length)]; // FIXME: back history
+        } else {
+          console.log('giving up');
+        }
+        return;
+      }
+
+      video.addEventListener('loadstart', _ => simulateClick(document, document.body.querySelector('div.mgp_playIcon')));
+      video.addEventListener('loadedmetadata', _ => {
+        // TODO: save video size? video.videoHeight
+        video.currentTime = random(video.duration / 4, video.duration / 3);
+      });
+      document.body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
         if (video.paused) {
           console.log('paused on grid menu');
-          const button = document.querySelector('div.mgp_playIcon');
+          const button = document.body.querySelector('div.mgp_playIcon');
           simulateClick(document, button);
           setTimeout(_ => {
             if (video.paused) {
@@ -81,26 +112,31 @@
     `;
     document.body.appendChild(style);
 
-    [...document.body.querySelectorAll('var.duration')].forEach(i => {
-      const duration = timeToSeconds(i.innerText);
-      const t = random(duration / 4, duration / 3);
-      const link = i.closest('a');
-      if (link) {
-        link.href += `&t=${t}`;
-      }
-
-      const div = i.closest('a').closest('div.phimage')?.parentNode;
-      if (duration < 20 * 60) { // TODO: check quality and non-free-premiumness
-        div?.classList.add('boringcontent');
-      }
-    });
+    const similarVideos = [...document.body.querySelectorAll('var.duration')]
+      .flatMap(i => {
+        const duration = timeToSeconds(i.textContent);
+        const t = random(duration / 4, duration / 3);
+        const link = i.closest('a');
+        if (link) {
+          link.href += `&t=${t}`;
+          const div = link.closest('div.phimage')?.parentNode; // TODO: find previews from current playlist as well
+          if (duration < 20 * 60) { // TODO: check quality, non-free-premiumness, my like or dislike; temporary (with exp backoff?) ban videos that fail to load?
+            div?.classList.add('boringcontent');
+          } else {
+            return [link.href];
+          }
+        }
+        return [];
+      });
 
     if (p.startsWith('/embed/')) {
       // this branch gets selected for both iframed and redirected embedded player
-      console.log('processing embed');
-      processEmbedded(document); // document is a part of iframe here
+      setTimeout(_ => {
+        console.log('processing embedded');
+        processEmbedded(document, similarVideos); // document is a part of iframe here
+      }, 500);
     } else if (p === '/view_video.php') {
-      const durationFromNormalPlayer = timeToSeconds(document.body.querySelector('span.mgp_total')?.innerText);
+      const durationFromNormalPlayer = timeToSeconds(document.body.querySelector('span.mgp_total')?.textContent);
       if (durationFromNormalPlayer) {
         if (!params.has('t') || Number(params.get('t')) >= durationFromNormalPlayer) {
           window.stop();
@@ -113,10 +149,10 @@
         const container = document.body.querySelector('div.playerFlvContainer');
         if (container) {
           const iframe = document.createElement('iframe');
-          /*iframe.onload = _ => {
-            console.log('iframe onload');
-            processEmbedded(iframe.contentWindow.document);
-          };*/
+          iframe.onload = _ => {
+            console.log('processing embedded video from onload');
+            processEmbedded(iframe.contentWindow.document, similarVideos);
+          };
           iframe.referrerpolicy = 'no-referrer';
           iframe.width = '100%';
           iframe.height = '100%';
@@ -126,7 +162,7 @@
           iframe.src = embedUrl;
           container.appendChild(iframe);
         } else {
-          console.log('redirecting to embedded player');
+          console.log('player not found, redirecting to embedded player');
           window.stop();
           window.location.href = embedUrl;
         }
