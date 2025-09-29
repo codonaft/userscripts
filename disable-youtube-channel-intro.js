@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.4
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -36,7 +36,7 @@
   };
 
   const subscribeOnChanges = (node, f) => {
-    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => process(n, observer))));
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => f(n, observer))));
     observer.observe(node, { childList: true, subtree: true });
     f(node, observer);
   };

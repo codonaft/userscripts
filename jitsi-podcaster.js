@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.js
 // ==/UserScript==
 
@@ -33,7 +33,7 @@
 
   const subscribeOnChanges = (node, f) => {
     f(node);
-    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(process)))
+    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(f)))
       .observe(node, { childList: true, subtree: true });
   };
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
@@ -51,7 +51,7 @@
   };
 
   const subscribeOnChanges = (node, f) => {
-    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => process(n, observer))));
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => f(n, observer))));
     observer.observe(node, { childList: true, subtree: true });
     f(node, observer);
   };
