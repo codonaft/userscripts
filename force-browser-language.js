@@ -5,7 +5,7 @@
 // @match https://*.google.com/*
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
    const first = lang => lang.split('-')[0]

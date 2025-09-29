@@ -4,7 +4,7 @@
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.js
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   const cleanup = node => {

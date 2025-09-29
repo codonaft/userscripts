@@ -5,7 +5,7 @@
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.js
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;

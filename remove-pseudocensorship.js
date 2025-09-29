@@ -4,7 +4,7 @@
 // @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.js
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   const process = node => {

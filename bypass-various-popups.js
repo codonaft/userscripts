@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -11,23 +11,23 @@
 // @match https://xhamster.com/*
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
-  const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 
   const process = (node, observer) => {
     if (node.nodeType !== 1) return;
 
     if (['A', 'BUTTON'].includes(node.tagName) && node.innerText.includes('Stay logged out')) {
-      setTimeout(() => node.click(), randomPause(1000, 1500));
+      setTimeout(_ => node.click(), randomPause(1000, 1500));
       return;
     }
 
     if (node.matches?.('div[role=dialog]')) {
-      setTimeout(() => {
+      setTimeout(_ => {
         node.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
         node.querySelectorAll('button.btn').forEach(i => {
           if (i.innerText.includes('Not now')) {
@@ -51,7 +51,7 @@
     }
 
     if (node.tagName === 'BUTTON' && node.getAttribute('data-role') === 'parental-control-confirm-button') {
-      setTimeout(() => node.click(), randomPause(1000, 1500));
+      setTimeout(_ => node.click(), randomPause(1000, 1500));
       return;
     }
 
@@ -63,9 +63,9 @@
 
     if (node.matches?.('#modalWrapMTubes')) {
       observer.disconnect();
-      setTimeout(() => {
+      setTimeout(_ => {
         document.body.querySelectorAll('#modalWrapMTubes > div > div > button').forEach(i => i.click());
-      }, randomPause(1000, 1500));
+      }, randomPause(100, 400));
       return;
     }
 

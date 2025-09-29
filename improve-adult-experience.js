@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set best quality and duration filters by default, make unrelated video previews transparent
-// @version 0.3
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -15,7 +15,7 @@
 // @match https://xhamster.com/search/*
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -26,49 +26,77 @@
   const p = url.pathname;
   let newUrl;
 
-  const random = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 
   const timeToSeconds = time => (time || '').split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 
-  const pornhub = () => {
+  const simulateClick = (document, node) => {
+    console.log('simulateClick');
+    const rect = node.getBoundingClientRect();
+    const clientX = rect.x + rect.width / 2;
+    const clientY = rect.y + rect.height / 2;
+    const target = document.elementFromPoint(clientX, clientY);
+    ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
+      .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
+  };
+
+  const pornhub = _ => {
     // TODO: never redirect, just update the URLs
 
     const processEmbedded = document => {
       const style = document.createElement('style');
       style.innerHTML = `
-        div.mgp_eventCatcher { display: none !important; }
         div.mgp_topBar { display: none !important; }
         div.mgp_thumbnailsGrid { display: none !important; }
         img.mgp_pornhub { display: none !important; }
       `;
       document.body.appendChild(style);
+
       const video = document.body.querySelector('video');
-      video?.addEventListener('loadedmetadata', _ => video.currentTime = random(video.duration / 4, video.duration / 3));
+      if (!video) return;
+
+      video.addEventListener('loadstart', _ => simulateClick(document, document.querySelector('div.mgp_playIcon')));
+      video.addEventListener('loadedmetadata', _ => video.currentTime = random(video.duration / 4, video.duration / 3));
+      document.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
+        if (video.paused) {
+          console.log('paused on grid menu');
+          const button = document.querySelector('div.mgp_playIcon');
+          simulateClick(document, button);
+          setTimeout(_ => {
+            if (video.paused) {
+              console.log('still paused');
+              simulateClick(document, button);
+            }
+          }, 500);
+        }
+      }, 100));
+
+      video.load();
     };
 
     const style = document.createElement('style');
     style.innerHTML = `
-      div.unrelatedcontent { opacity: 10%; }
-      div.unrelatedcontent:hover { opacity: 40%; }
+      div.boringcontent { opacity: 10%; }
+      div.boringcontent:hover { opacity: 40%; }
     `;
-    document.querySelector('div#main-container')?.appendChild(style);
+    document.body.appendChild(style);
 
     [...document.body.querySelectorAll('var.duration')].forEach(i => {
       const duration = timeToSeconds(i.innerText);
-      const t = random(Math.floor(duration / 4), Math.floor(duration / 3));
+      const t = random(duration / 4, duration / 3);
       const link = i.closest('a');
       if (link) {
         link.href += `&t=${t}`;
       }
 
       const div = i.closest('a').closest('div.phimage')?.parentNode;
-      if (duration < 20 * 60) { // TODO: check quality
-        div?.classList.add('unrelatedcontent');
+      if (duration < 20 * 60) { // TODO: check quality and non-free-premiumness
+        div?.classList.add('boringcontent');
       }
     });
 
     if (p.startsWith('/embed/')) {
-      // happens for both iframed and redirected embedded player here
+      // this branch gets selected for both iframed and redirected embedded player
       console.log('processing embed');
       processEmbedded(document); // document is a part of iframe here
     } else if (p === '/view_video.php') {
@@ -76,7 +104,7 @@
       if (durationFromNormalPlayer) {
         if (!params.has('t') || Number(params.get('t')) >= durationFromNormalPlayer) {
           window.stop();
-          params.set('t', random(Math.floor(durationFromNormalPlayer / 4), Math.floor(durationFromNormalPlayer / 3)));
+          params.set('t', random(durationFromNormalPlayer / 4, durationFromNormalPlayer / 3));
           window.location.replace(url.toString());
         }
       } else {
@@ -85,7 +113,7 @@
         const container = document.body.querySelector('div.playerFlvContainer');
         if (container) {
           const iframe = document.createElement('iframe');
-          /*iframe.onload = () => {
+          /*iframe.onload = _ => {
             console.log('iframe onload');
             processEmbedded(iframe.contentWindow.document);
           };*/
@@ -110,7 +138,7 @@
     }
   };
 
-  const xvideos = () => {
+  const xvideos = _ => {
     // TODO: never redirect, just update the URLs
 
     if (p === '/' && params.has('k') && !params.has('quality')) {
@@ -127,7 +155,7 @@
     }
   };
 
-  const spankbang = () => {
+  const spankbang = _ => {
     // TODO: never redirect, just update the URLs
 
     if (!p.endsWith('/tags') && !p.includes('/playlist/') && !(params.has('q') && params.has('d'))) {
@@ -140,7 +168,7 @@
     }
   };
 
-  const porntrex = () => {
+  const porntrex = _ => {
     const expectedPage = (page, href) => href.startsWith(`https://www.porntrex.com/${page}/`) && (page === 'top-rated' || href.split('/').length > 5);
 
     [...document.body.querySelectorAll('a')]
@@ -160,7 +188,7 @@
       });
   };
 
-  const xhamster = () => {
+  const xhamster = _ => {
     // TODO: never redirect, just update the URLs
 
     if (p.startsWith('/search/')) {

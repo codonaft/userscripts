@@ -6,22 +6,22 @@
 // @match https://www.youtube.com/*
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
-  const randomPause = () => {
+  const randomPause = _ => {
     const min = 3000;
     const max = 5000;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
+    return Math.floor(Math.random() * (max - min + 1) + min);
   };
 
   const process = (node, observer) => {
     if (node.nodeType !== 1) return;
 
     if (node.classList.contains('yt-spec-button-shape-next')) {
-      setTimeout(() => {
+      setTimeout(_ => {
         if (node.getAttribute('aria-label')?.includes('No thanks')) {
           node.click();
         }
@@ -29,14 +29,14 @@
       observer.disconnect();
       return;
     } else if (node.classList.contains('ytd-single-option-survey-renderer')) {
-      setTimeout(() => {
+      setTimeout(_ => {
         if (node.getAttribute('icon')?.includes('yt-icons:close')) {
           node.click();
         }
       }, randomPause());
       return;
     } else if (node.tagName === 'DIV' && node.textContent.includes('My Ad Center')) {
-      setTimeout(() => {
+      setTimeout(_ => {
         node.querySelectorAll('button').forEach(i => {
           if (i.getAttribute('aria-label')?.includes('Close')) {
             i.click();

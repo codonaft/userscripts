@@ -7,7 +7,7 @@
 // @match https://www.youtube.com/channel/*
 // ==/UserScript==
 
-(() => {
+(_ => {
   'use strict';
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
