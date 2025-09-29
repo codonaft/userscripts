@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Remove Pseudocensorship
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.js
 // ==/UserScript==
 
@@ -10,7 +10,7 @@
   const process = node => {
     if (node.nodeType !== 1) return;
 
-    if (node.tagName === 'P' && node.innerText.includes('НАСТОЯЩИЙ МАТЕРИАЛ (ИНФОРМАЦИЯ)')) {
+    if (node.tagName === 'P' && node.textContent.includes('НАСТОЯЩИЙ МАТЕРИАЛ (ИНФОРМАЦИЯ)')) {
       node.style.display = 'none';
       return;
     }

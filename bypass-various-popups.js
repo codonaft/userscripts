@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -21,16 +21,16 @@
   const process = (node, observer) => {
     if (node.nodeType !== 1) return;
 
-    if (['A', 'BUTTON'].includes(node.tagName) && node.innerText.includes('Stay logged out')) {
-      setTimeout(_ => node.click(), randomPause(1000, 1500));
-      return;
-    }
-
     if (node.matches?.('div[role=dialog]')) {
       setTimeout(_ => {
         node.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
         node.querySelectorAll('button.btn').forEach(i => {
-          if (i.innerText.includes('Not now')) {
+          if (i.textContent.includes('Not now')) {
+            i.click();
+          }
+        });
+        node.querySelectorAll('a').forEach(i => {
+          if (i.textContent.includes('Stay logged out')) {
             i.click();
           }
         });
