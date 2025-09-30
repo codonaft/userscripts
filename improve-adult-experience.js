@@ -77,9 +77,7 @@
         div.mgp_thumbnailsGrid { display: none !important; }
         img.mgp_pornhub { display: none !important; }
       `;
-      const styleApplied = [...main.querySelectorAll('style')]
-        .filter(i => i.innerHTML === css)
-        .length > 0;
+      const styleApplied = !![...main.querySelectorAll('style')].find(i => i.innerHTML === css);
       if (styleApplied) {
         console.log('embedded video is already initialized');
         return;
@@ -274,7 +272,7 @@
     const expectedPage = (page, href) => href.startsWith(`https://www.porntrex.com/${page}/`) && (page === 'top-rated' || href.split('/').length > 5);
 
     [...document.body.querySelectorAll('a')]
-      .filter(i => ['categories', 'channels', 'models', 'top-rated'].filter(page => expectedPage(page, i.href)).length > 0)
+      .filter(i => !!['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, i.href)))
       .forEach(i => {
         const url = new URL(i.href);
         const ps = url.pathname.split('/').filter(i => i.length > 0);
