@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set best quality and duration filters by default, make unwanted video previews transparent
-// @version 0.8
+// @description Skip intros, set best quality and duration filters by default, make unwanted video previews transparent, do fallbacks in case of load failures
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -39,19 +39,27 @@
 
   const simulateClick = (document, node) => {
     console.log('simulateClick');
-    if (!node) return;
-    const rect = node.getBoundingClientRect();
-    const clientX = rect.x + rect.width / 2;
-    const clientY = rect.y + rect.height / 2;
-    const target = document.elementFromPoint(clientX, clientY);
-    ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
-      .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
+    try {
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const clientX = rect.x + rect.width / 2;
+      const clientY = rect.y + rect.height / 2;
+      const target = document.elementFromPoint(clientX, clientY);
+      ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
+        .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const subscribeOnChanges = (node, f) => {
-    f(node);
-    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(f)))
-      .observe(node, { childList: true, subtree: true });
+    try {
+      f(node);
+      new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(f)))
+        .observe(node, { childList: true, subtree: true });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const pornhub = _ => {
@@ -68,18 +76,26 @@
     const isUnwanted = url => currentTime() < loadUnwanted()[videoId(url)];
     const videoId = url => url.searchParams.get('viewkey') || url.pathname.split('/').slice(-1)[0];
     const watchedVideos = new Set;
-    const disliked = main => !!main.querySelector('div.active[data-title="I Dislike This"]');
+
+    const disliked = body => !!body.querySelector('div.active[data-title="I Dislike This"]');
+    const premiumRedirect = node => node.href.startsWith('javascript:');
+
+    const searchFilterParams = Object.entries({
+      'min_duration': MIN_DURATION_MINS,
+      'hd': 1,
+      'o': 'tr',
+      't': 'm',
+    });
 
     const processEmbedded = (document, similarVideos) => {
-      const main = document.querySelector('div#main-container') || document.body;
-
+      const body = document.body;
       try {
         const css = `
           div.mgp_topBar { display: none !important; }
           div.mgp_thumbnailsGrid { display: none !important; }
           img.mgp_pornhub { display: none !important; }
         `;
-        const styleApplied = !![...main.querySelectorAll('style')].find(i => i.innerHTML === css);
+        const styleApplied = !![...body.querySelectorAll('style')].find(i => i.innerHTML === css);
         if (styleApplied) {
           console.log('embedded video is already initialized');
           return;
@@ -87,13 +103,13 @@
         console.log('applying style');
         const style = document.createElement('style');
         style.innerHTML = css;
-        main.appendChild(style);
+        body.appendChild(style);
       } catch (e) {
         console.error(e);
       }
 
       try {
-        const requiresRefresh = main.querySelector('div.mgp_errorIcon') && main.querySelector('p')?.textContent.includes('Please refresh the page');
+        const requiresRefresh = body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page');
         if (requiresRefresh) {
           console.log('refreshing after error');
           window.location.href = window.location.toString();
@@ -102,7 +118,7 @@
         console.error(e);
       }
 
-      const video = main.querySelector('video');
+      const video = body.querySelector('video');
       try {
         if (!video) {
           console.log('embedding this video is probably not allowed');
@@ -128,17 +144,17 @@
         console.error(e);
       }
 
-      video.addEventListener('loadstart', _ => simulateClick(document, main.querySelector('div.mgp_playIcon')));
+      video.addEventListener('loadstart', _ => simulateClick(document, body.querySelector('div.mgp_playIcon')));
       video.addEventListener('loadedmetadata', _ => {
-        if (disliked(main)) {
+        if (disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
         video.currentTime = random(video.duration / 4, video.duration / 3);
       });
-      main.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
+      body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
         if (video.paused) {
           console.log('paused on grid menu');
-          const button = main.querySelector('div.mgp_playIcon');
+          const button = body.querySelector('div.mgp_playIcon');
           simulateClick(document, button);
           setTimeout(_ => {
             if (video.paused) {
@@ -152,7 +168,7 @@
       video.load();
     };
 
-    const premiumRedirect = node => node.href.startsWith('javascript:');
+    const body = document.body;
 
     const processPreview = node => {
       try {
@@ -182,48 +198,40 @@
 
     const processPlaylistItem = node => {
       if (node.nodeType !== 1) return;
-
       if (node.tagName === 'SPAN' && node.classList.contains('duration')) {
         processPreview(node);
         return;
       }
-
       node.childNodes.forEach(processPlaylistItem);
     };
-
-    const main = document.querySelector('div#main-container') || document.body;
-    subscribeOnChanges(main, processPlaylistItem);
-
-    try {
-      const style = document.createElement('style');
-      style.innerHTML = `
-        div.${UNWANTED}, li.${UNWANTED} { opacity: 10%; }
-        div.${UNWANTED}:hover, li.${UNWANTED}:hover { opacity: 40%; }
-      `;
-      main.appendChild(style);
-    } catch (e) {
-      console.error(e);
-    }
-
-    const filterParams = Object.entries({
-      'min_duration': MIN_DURATION_MINS,
-      'hd': 1,
-      'o': 'tr',
-      't': 'm',
-    });
 
     const processLink = node => {
       if (node.nodeType !== 1) return;
       if (node.tagName === 'A') {
         try {
-          if (premiumRedirect(node)) return;
+          if (premiumRedirect(node) || node.closest('ul.filterListItem')) return;
           const url = new URL(node.href.startsWith('https:') ? node.href : `${window.location.origin}${node.href}`);
           const params = url.searchParams;
           const p = url.pathname;
-          if (p === '/video' || p === '/video/search' || p.startsWith('/categories/')) {
-            filterParams.forEach(([key, value]) => params.set(key, value));
-            node.href = url.toString();
+          const parts = p.split('/');
+          if (['/video', '/video/search'].includes(p) || p.startsWith('/categories/')) {
+            searchFilterParams.forEach(([key, value]) => params.set(key, value));
+          } else if (p.startsWith('/pornstar/')) {
+            if (parts.length === 3) {
+              url.pathname = [...parts, 'videos', 'upload'].join('/');
+            } else if (!p.endsWith('/videos/upload')) {
+              return;
+            }
+            params.set('o', 'lg');
+          } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
+            if (parts.length === 3) {
+              url.pathname = [...parts, 'videos'].join('/');
+            } else if (!p.endsWith('/videos')) {
+              return;
+            }
+            params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
           }
+          setTimeout(_ => node.href = url.toString(), 500);
         } catch (e) {
           console.error(node.href, e);
         }
@@ -232,23 +240,40 @@
       node.childNodes.forEach(processLink);
     };
 
-    subscribeOnChanges(main, processLink);
-
-    // TODO
-    /*const searchForm = main.querySelector('form#search_form') || main.querySelector('form');
-    if (searchForm) {
-      filterParams.forEach(([key, value]) => {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = key;
-        input.value = value;
-        searchForm.appendChild(input);
-      });
-    }*/
-
-    const similarVideos = [...main.querySelectorAll('var.duration')]
+    const similarVideos = [...body.querySelectorAll('var.duration')]
       .map(i => processPreview(i))
       .filter(i => i);
+    subscribeOnChanges(body, processPlaylistItem);
+    subscribeOnChanges(body, processLink);
+
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.${UNWANTED}, li.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover, li.${UNWANTED}:hover { opacity: 40%; }
+        #searchSuggestions a:focus { background-color: #111111; }
+      `;
+      body.appendChild(style);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const searchForm = body.querySelector('form#search_form') || body.querySelector('form');
+    const searchInput = searchForm?.querySelector('input#searchInput, input[name="search"]');
+    searchForm?.addEventListener('submit', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const node = document.activeElement;
+      const input = searchInput || (node.tagName === 'INPUT' && searchForm.contains(node) ? node : undefined);
+      const query = (input?.value || '').trim();
+      if (query.length === 0) return;
+
+      const url = new URL(searchForm.action);
+      searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
+      url.searchParams.set('search', query);
+      window.location.href = url.toString();
+    }, true);
 
     if (p.startsWith('/embed/')) {
       // this branch gets selected for both iframed and redirected embedded player
@@ -257,11 +282,11 @@
         processEmbedded(document, similarVideos); // document is a part of iframe here
       }, 1000);
     } else if (p === '/view_video.php') {
-      const durationFromNormalPlayer = timeToSeconds(main.querySelector('span.mgp_total')?.textContent);
+      const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
       if (durationFromNormalPlayer) {
-        const lowQuality = ![...main.querySelectorAll('ul.mgp_quality > li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
+        const lowQuality = ![...body.querySelectorAll('ul.mgp_quality > li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
         console.log('low quality', lowQuality);
-        if (lowQuality || disliked(main)) {
+        if (lowQuality || disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
 
@@ -273,7 +298,7 @@
       } else {
         console.log('fallback to embedded player');
         const embedUrl = `https://www.pornhub.com/embed/${params.get('viewkey')}`;
-        const container = main.querySelector('div.playerFlvContainer');
+        const container = body.querySelector('div.playerFlvContainer');
         if (container) {
           const iframe = document.createElement('iframe');
           iframe.onload = _ => {
@@ -381,6 +406,7 @@
     xhamster();
   }
 
+  // TODO: remove
   if (newUrl) {
     window.stop();
     window.location.replace(newUrl);
