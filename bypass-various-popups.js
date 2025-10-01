@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -46,11 +46,11 @@
     }
 
     if (node.matches?.('div#credential_picker_container')) {
-      node.style.display = 'none'
+      node.style.display = 'none';
       return;
     }
 
-    if (node.tagName === 'BUTTON' && node.getAttribute('data-role') === 'parental-control-confirm-button') {
+    if (node.tagName === 'BUTTON' && (node.getAttribute('data-role') === 'parental-control-confirm-button' || node.textContent.includes('Stay logged out'))) {
       setTimeout(_ => node.click(), randomPause(1000, 1500));
       return;
     }
