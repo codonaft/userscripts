@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set best quality and duration filters by default, make unrelated video previews transparent
-// @version 0.7
+// @description Skip intros, set best quality and duration filters by default, make unwanted video previews transparent
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -18,7 +18,9 @@
 (_ => {
   'use strict';
 
-  const MIN_DURATION_MIN = 20;
+  // TODO: improve resistance to exceptions
+
+  const MIN_DURATION_MINS = 20;
   const MIN_VIDEO_HEIGHT = 1080;
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -37,6 +39,7 @@
 
   const simulateClick = (document, node) => {
     console.log('simulateClick');
+    if (!node) return;
     const rect = node.getBoundingClientRect();
     const clientX = rect.x + rect.width / 2;
     const clientY = rect.y + rect.height / 2;
@@ -52,9 +55,6 @@
   };
 
   const pornhub = _ => {
-    // TODO: never redirect, just update the URLs
-    // TODO: improve resistance to exceptions
-
     const UNWANTED = '__unwanted';
     const loadUnwanted = () => JSON.parse(localStorage.getItem(UNWANTED)) || {};
     const setUnwanted = (url, ttl) => {
@@ -72,47 +72,60 @@
 
     const processEmbedded = (document, similarVideos) => {
       const main = document.querySelector('div#main-container') || document.body;
-      const css = `
-        div.mgp_topBar { display: none !important; }
-        div.mgp_thumbnailsGrid { display: none !important; }
-        img.mgp_pornhub { display: none !important; }
-      `;
-      const styleApplied = !![...main.querySelectorAll('style')].find(i => i.innerHTML === css);
-      if (styleApplied) {
-        console.log('embedded video is already initialized');
-        return;
-      }
-      console.log('applying style');
-      const style = document.createElement('style');
-      style.innerHTML = css;
-      main.appendChild(style);
 
-      const requiresRefresh = main.querySelector('div.mgp_errorIcon') && main.querySelector('p')?.textContent.includes('Please refresh the page');
-      if (requiresRefresh) {
-        console.log('refreshing after error');
-        window.location.href = window.location.toString();
+      try {
+        const css = `
+          div.mgp_topBar { display: none !important; }
+          div.mgp_thumbnailsGrid { display: none !important; }
+          img.mgp_pornhub { display: none !important; }
+        `;
+        const styleApplied = !![...main.querySelectorAll('style')].find(i => i.innerHTML === css);
+        if (styleApplied) {
+          console.log('embedded video is already initialized');
+          return;
+        }
+        console.log('applying style');
+        const style = document.createElement('style');
+        style.innerHTML = css;
+        main.appendChild(style);
+      } catch (e) {
+        console.error(e);
+      }
+
+      try {
+        const requiresRefresh = main.querySelector('div.mgp_errorIcon') && main.querySelector('p')?.textContent.includes('Please refresh the page');
+        if (requiresRefresh) {
+          console.log('refreshing after error');
+          window.location.href = window.location.toString();
+        }
+      } catch (e) {
+        console.error(e);
       }
 
       const video = main.querySelector('video');
-      if (!video) {
-        console.log('embedding this video is probably not allowed');
-        window.stop();
+      try {
+        if (!video) {
+          console.log('embedding this video is probably not allowed');
+          window.stop();
 
-        if (!isUnwanted(url)) {
-          console.log('making single refresh attempt');
-          setUnwanted(url, currentTime() + 5 * 60);
-          window.location = url.toString();
+          if (!isUnwanted(url)) {
+            console.log('making single refresh attempt');
+            setUnwanted(url, currentTime() + 60 * 60);
+            window.location = url.toString();
+            return;
+          }
+
+          if (similarVideos.length > 0) {
+            console.log('redirecting to a random non-unwanted similar video');
+            const newSimilarVideos = similarVideos.filter(i => !watchedVideos.has(i));
+            window.location.href = newSimilarVideos.length > 0 ? pickRandom(newSimilarVideos) : pickRandom(similarVideos);
+          } else {
+            console.log('giving up');
+          }
           return;
         }
-
-        if (similarVideos.length > 0) {
-          console.log('redirecting to random non-unwanted similar video');
-          const newSimilarVideos = similarVideos.filter(i => !watchedVideos.has(i));
-          window.location.href = newSimilarVideos.length > 0 ? pickRandom(newSimilarVideos) : pickRandom(similarVideos);
-        } else {
-          console.log('giving up');
-        }
-        return;
+      } catch (e) {
+        console.error(e);
       }
 
       video.addEventListener('loadstart', _ => simulateClick(document, main.querySelector('div.mgp_playIcon')));
@@ -139,26 +152,31 @@
       video.load();
     };
 
-    const processPreview = i => {
-      const link = i.closest('a');
-      if (link) {
-        const duration = timeToSeconds(i.textContent);
-        const t = random(duration / 4, duration / 3);
+    const premiumRedirect = node => node.href.startsWith('javascript:');
 
-        const premiumRedirect = !link.href.startsWith('https://');
-        if (!premiumRedirect) {
+    const processPreview = node => {
+      try {
+        const link = node.closest('a');
+        if (!link) return;
+
+        const duration = timeToSeconds(node.textContent);
+        const premium = premiumRedirect(link);
+        if (!premium) {
+          const t = random(duration / 4, duration / 3);
           link.href += `&t=${t}`;
         }
 
-        const node = link.closest('div.phimage')?.parentNode || link.closest('li');
-        if (premiumRedirect || duration < MIN_DURATION_MIN * 60 || isUnwanted(new URL(link.href))) {
-          node?.classList.add(UNWANTED);
+        const container = link.closest('div.phimage')?.parentNode || link.closest('li');
+        if (premium || duration < MIN_DURATION_MINS * 60 || isUnwanted(new URL(link.href))) {
+          container?.classList.add(UNWANTED);
         } else {
           if (link.querySelector('div.watchedVideoText')) {
             watchedVideos.add(link.href);
           }
           return link.href;
         }
+      } catch (e) {
+        console.log(e);
       }
     };
 
@@ -176,12 +194,57 @@
     const main = document.querySelector('div#main-container') || document.body;
     subscribeOnChanges(main, processPlaylistItem);
 
-    const style = document.createElement('style');
-    style.innerHTML = `
-      div.${UNWANTED}, li.${UNWANTED} { opacity: 10%; }
-      div.${UNWANTED}:hover, li.${UNWANTED}:hover { opacity: 40%; }
-    `;
-    main.appendChild(style);
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.${UNWANTED}, li.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover, li.${UNWANTED}:hover { opacity: 40%; }
+      `;
+      main.appendChild(style);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const filterParams = Object.entries({
+      'min_duration': MIN_DURATION_MINS,
+      'hd': 1,
+      'o': 'tr',
+      't': 'm',
+    });
+
+    const processLink = node => {
+      if (node.nodeType !== 1) return;
+      if (node.tagName === 'A') {
+        try {
+          if (premiumRedirect(node)) return;
+          const url = new URL(node.href.startsWith('https:') ? node.href : `${window.location.origin}${node.href}`);
+          const params = url.searchParams;
+          const p = url.pathname;
+          if (p === '/video' || p === '/video/search' || p.startsWith('/categories/')) {
+            filterParams.forEach(([key, value]) => params.set(key, value));
+            node.href = url.toString();
+          }
+        } catch (e) {
+          console.error(node.href, e);
+        }
+        return;
+      }
+      node.childNodes.forEach(processLink);
+    };
+
+    subscribeOnChanges(main, processLink);
+
+    // TODO
+    /*const searchForm = main.querySelector('form#search_form') || main.querySelector('form');
+    if (searchForm) {
+      filterParams.forEach(([key, value]) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        searchForm.appendChild(input);
+      });
+    }*/
 
     const similarVideos = [...main.querySelectorAll('var.duration')]
       .map(i => processPreview(i))
@@ -231,10 +294,6 @@
           window.location.href = embedUrl;
         }
       }
-    } else if (params.get('hd') !== '1' && !params.has('min_duration') && (p.startsWith('/categories/') || p === '/video' || p === '/video/search')) {
-      params.set('min_duration', MIN_DURATION_MIN);
-      params.set('hd', 1);
-      newUrl = url.toString();
     }
   };
 
@@ -243,13 +302,13 @@
 
     if (p === '/' && params.has('k') && !params.has('quality')) {
       params.set('sort', 'rating');
-      params.set('durf', `${MIN_DURATION_MIN}min_more`);
+      params.set('durf', `${MIN_DURATION_MINS}min_more`);
       params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
       newUrl = url.toString();
     } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
       const ps = p.split('/');
       if (ps.length >= 3) {
-        url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MIN}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
+        url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
         newUrl = url.toString();
       }
     }
@@ -263,7 +322,7 @@
         url.pathname = '/trending_videos/'
       }
       params.set('q', 'fhd');
-      params.set('d', MIN_DURATION_MIN);
+      params.set('d', MIN_DURATION_MINS);
       newUrl = url.toString();
     }
   };
@@ -274,17 +333,21 @@
     [...document.body.querySelectorAll('a')]
       .filter(i => !!['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, i.href)))
       .forEach(i => {
-        const url = new URL(i.href);
-        const ps = url.pathname.split('/').filter(i => i.length > 0);
-        for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
-          if (!ps.includes(i)) {
-            ps.push(i);
+        try {
+          const url = new URL(i.href);
+          const ps = url.pathname.split('/').filter(i => i.length > 0);
+          for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
+            if (!ps.includes(i)) {
+              ps.push(i);
+            }
           }
+          ps.push('');
+          ps.unshift('');
+          url.pathname = ps.join('/');
+          i.href = url.toString();
+        } catch (e) {
+          console.error(i.href, e);
         }
-        ps.push('');
-        ps.unshift('');
-        url.pathname = ps.join('/');
-        i.href = url.toString();
       });
   };
 
