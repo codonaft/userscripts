@@ -2,7 +2,7 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.js
 // ==/UserScript==
 
@@ -18,16 +18,19 @@
 
   console.log('SearXNG: no results');
   const url = new URL(window.location.href);
-  if (url.host.endsWith('.onion')) {
+  if (url.hostname.endsWith('.onion')) {
     url.host = 'codonaftbvv4j5k7nsrdivbdblycqrng5ls2qkng6lm77svepqjyxgid.onion';
-  } else if (url.host.endsWith('.i2p')) {
+    url.protocol = 'http:';
+  } else if (url.hostname.endsWith('.i2p')) {
     url.host = 'codonftbnpdkjwyflssto3iklawhuthbe37l6swigegqkyyfmiqa.b32.i2p';
+    url.protocol = 'http:';
   } else {
     url.host = 'codonaft.com';
+    url.protocol = 'https:';
   }
   url.pathname = '/searxng';
   url.searchParams.set('fast', '0');
   const params = url.searchParams.toString();
-  url.searchParams.forEach((_, i) => url.searchParams.delete(i));
+  url.search = '';
   window.location.replace(`${url.toString()}#${params}`);
 })()
