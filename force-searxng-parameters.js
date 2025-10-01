@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
+// @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
 // @version 0.1
-// @downloadURL https://userscripts.codonaft.com/searxng-force-parameters.js
+// @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.js
 // ==/UserScript==
 
 (_ => {
