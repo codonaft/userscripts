@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.js
 // ==/UserScript==
 
@@ -32,14 +32,13 @@
   const process = node => {
     if (node.nodeType !== 1) return;
 
-    if (node.matches?.('span.style-scope.ytd-topbar-logo-renderer')) {
+    const h = window.location.hostname;
+    if (['youtube.com', 'youtu.be', 'google.com'].find(i => h.endsWith(i)) && node.matches?.('span.style-scope.ytd-topbar-logo-renderer, div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als')) {
       node.style.display = 'none';
       return;
     }
 
-    if (node.tagName === 'A') {
-      cleanup(node);
-    }
+    cleanup(node);
     node.childNodes.forEach(process);
   };
 
