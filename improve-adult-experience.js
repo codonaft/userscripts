@@ -1,24 +1,22 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures
-// @version 0.11
+// @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
-// @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
 // @match https://www.pornhub.com/*
 // @match https://www.porntrex.com/*
-// @match https://www.xvideos.com/
-// @match https://www.xvideos.com/c/*
-// @match https://xhamster.com/
-// @match https://xhamster.com/categories/*
-// @match https://xhamster.com/channels/*
-// @match https://xhamster.com/search/*
+// @match https://www.xvideos.com/*
+// @match https://xhamster.com/*
 // ==/UserScript==
 
 (_ => {
   'use strict';
 
-  const MINOR_IMPROVEMENTS = true; // NOTE: try to turn these off in case if UI is somehow broke for you
+  // TODO: DRY links
+
+  const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if UI appears to be broken somehow
   const MIN_DURATION_MINS = 20;
   const MIN_VIDEO_HEIGHT = 1080;
 
@@ -28,6 +26,7 @@
   const params = url.searchParams;
   const h = url.hostname;
   const p = url.pathname;
+  const valid = link => link.href.startsWith(url.origin);
 
   const currentTime = () => Math.round(Date.now() / 1000);
   const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
@@ -257,8 +256,8 @@
       console.error(e);
     }
 
-    const searchForm = body.querySelector('form#search_form') || body.querySelector('form');
-    const searchInput = searchForm?.querySelector('input#searchInput, input[name="search"]');
+    const searchInput = body.querySelector('input#searchInput[type="text"], input[type="text"][name="search"], input[type="text"]');
+    const searchForm = searchInput?.closest('form');
     searchForm?.addEventListener('submit', event => {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -278,24 +277,11 @@
       document.addEventListener('keydown', event => {
         if (event.ctrlKey || event.altKey || event.metaKey) return;
 
-        if (document.activeElement === searchInput) {
-          if (event.key !== 'Escape') return;
-
-          event.preventDefault();
-          setTimeout(_ => {
-            searchInput.blur();
-            body.querySelector('div.container')?.click();
-          }, 200);
-        } else if (['/','s', 'S'].includes(event.key)) {
+        if (document.activeElement !== searchInput && ['/','s', 'S'].includes(event.key)) {
           event.preventDefault();
           searchInput.focus();
         }
       });
-
-      setTimeout(_ => {
-        searchInput.blur();
-        body.querySelector('div.container')?.click();
-      }, 400);
     }
 
     if (p.startsWith('/embed/')) {
@@ -346,30 +332,57 @@
   };
 
   const xvideos = _ => {
-    document.body.querySelectorAll('a').forEach(link => {
-      try {
-        const url = new URL(link.href);
-        const params = url.searchParams;
-        const p = url.pathname;
-        if (p === '/' && params.has('k') && !params.has('quality')) {
-          params.set('sort', 'rating');
-          params.set('durf', `${MIN_DURATION_MINS}min_more`);
-          params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
-          link.href = url.toString();
-        } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
-          const ps = p.split('/');
-          if (ps.length >= 3) {
-            url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
-            link.href = url.toString();
+    const searchInput = document.body.querySelector('input.search-input[type="text"], input[placeholder="Search X videos"], input[type="text"]');
+    const searchForm = searchInput?.closest('form');
+    searchForm?.addEventListener('submit', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const query = (searchInput.value || '').trim();
+      if (query.length === 0) return;
+
+      const url = new URL(searchForm.action);
+      const params = url.searchParams;
+      params.set('sort', 'rating');
+      params.set('durf', `${MIN_DURATION_MINS}min_more`);
+      params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
+      url.searchParams.set('k', query);
+      window.location.href = url.toString();
+    }, true);
+
+    const processLink = node => {
+      if (node.nodeType !== 1) return;
+      if (node.tagName === 'A') {
+        try {
+          if (!valid(node) || node.closest('div.search-filters')) return;
+
+          const url = new URL(node.href);
+          const params = url.searchParams;
+          const p = url.pathname;
+          if (p === '/' && params.has('k') && !params.has('quality')) {
+            params.set('sort', 'rating');
+            params.set('durf', `${MIN_DURATION_MINS}min_more`);
+            params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
+            node.href = url.toString();
+          } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
+            const ps = p.split('/');
+            if (ps.length >= 3) {
+              url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
+              node.href = url.toString();
+            }
           }
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.error(e);
       }
-    });
+      node.childNodes.forEach(processLink);
+    };
+
+    subscribeOnChanges(document.body, processLink);
   };
 
   const spankbang = _ => {
+    // TODO: search?
     document.body.querySelectorAll('a').forEach(link => {
       try {
         const url = new URL(link.href);
@@ -390,33 +403,75 @@
   };
 
   const porntrex = _ => {
+    const body = document.body;
+    const searchInput = body.querySelector('input[type="text"][name="q"]'); // TODO
+    body.querySelector('button[type="submit"][aria-label="search"], button[type="submit"]')?.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const query = (searchInput.value || '').trim();
+      if (query.length === 0) return;
+
+      window.location.href = `${window.location.origin}/search/${query}/top-rated/thirty-all-min/`;
+    }, true);
+
     const expectedPage = (page, href) =>
       href.startsWith(`https://www.porntrex.com/${page}/`) && (page === 'top-rated' || href.split('/').length > 5);
 
-    document.body.querySelectorAll('a').forEach(link => {
-      try {
-        if (!['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, link.href))) return;
-
-        const url = new URL(link.href);
-        const ps = url.pathname.split('/').filter(i => i.length > 0);
-        for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
-          if (!ps.includes(i)) {
-            ps.push(i);
+    const processLink = node => {
+      if (node.nodeType !== 1) return;
+      if (node.tagName === 'A') {
+        try {
+          if (['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, node.href))) {
+            const url = new URL(node.href);
+            const ps = url.pathname.split('/').filter(i => i.length > 0);
+            for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
+              if (!ps.includes(i)) {
+                ps.push(i);
+              }
+            }
+            ps.push('');
+            ps.unshift('');
+            url.pathname = ps.join('/');
+            node.href = url.toString();
+          } else if (node.href.startsWith(`${window.location.origin}/search/`) && !node.href.includes('/top-rated/thirty-all-min/')) {
+            node.href = `${node.href}top-rated/thirty-all-min/`;
           }
+        } catch (e) {
+          console.error(e);
         }
-        ps.push('');
-        ps.unshift('');
-        url.pathname = ps.join('/');
-        link.href = url.toString();
-      } catch (e) {
-        console.error(link.href, e);
       }
-    });
+
+      node.childNodes.forEach(processLink);
+    };
+
+    body.querySelectorAll('a').forEach(processLink);
+    subscribeOnChanges(document.body, processLink);
   };
 
   const xhamster = _ => {
+    const searchInput = document.body.querySelector('input[name="q"][type="text"], input[type="text"]');
+    const searchForm = searchInput?.closest('form');
+    searchForm?.querySelector('button.search-submit[type="submit"], button[type="submit"]')?.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const query = (searchInput.value || '').trim();
+      if (query.length === 0) return;
+
+      const url = new URL(`${window.location.origin}/search/${query}`);
+      const params = url.searchParams;
+      params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
+      params.set('min-duration', '20');
+      params.set('length', 'full');
+      window.location.href = url.toString();
+    }, true);
+
+    // TODO: suggest?
     document.body.querySelectorAll('a').forEach(link => {
       try {
+        if (!valid(link)) return;
+
         const url = new URL(link.href);
         const params = url.searchParams;
         const p = url.pathname;
