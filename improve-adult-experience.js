@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures
-// @version 0.10
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -18,8 +18,6 @@
 (_ => {
   'use strict';
 
-  // TODO: improve resistance to exceptions
-
   const MINOR_IMPROVEMENTS = true; // NOTE: try to turn these off in case if UI is somehow broke for you
   const MIN_DURATION_MINS = 20;
   const MIN_VIDEO_HEIGHT = 1080;
@@ -30,7 +28,6 @@
   const params = url.searchParams;
   const h = url.hostname;
   const p = url.pathname;
-  let newUrl;
 
   const currentTime = () => Math.round(Date.now() / 1000);
   const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
@@ -65,6 +62,7 @@
 
   const pornhub = _ => {
     const UNWANTED = '__unwanted';
+    // TODO: collect garbage
     const loadUnwanted = () => JSON.parse(localStorage.getItem(UNWANTED)) || {};
     const setUnwanted = (url, ttl) => {
       const id = videoId(url);
@@ -348,75 +346,97 @@
   };
 
   const xvideos = _ => {
-    // TODO: never redirect, just update the URLs
-
-    if (p === '/' && params.has('k') && !params.has('quality')) {
-      params.set('sort', 'rating');
-      params.set('durf', `${MIN_DURATION_MINS}min_more`);
-      params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
-      newUrl = url.toString();
-    } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
-      const ps = p.split('/');
-      if (ps.length >= 3) {
-        url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
-        newUrl = url.toString();
+    document.body.querySelectorAll('a').forEach(link => {
+      try {
+        const url = new URL(link.href);
+        const params = url.searchParams;
+        const p = url.pathname;
+        if (p === '/' && params.has('k') && !params.has('quality')) {
+          params.set('sort', 'rating');
+          params.set('durf', `${MIN_DURATION_MINS}min_more`);
+          params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
+          link.href = url.toString();
+        } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
+          const ps = p.split('/');
+          if (ps.length >= 3) {
+            url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
+            link.href = url.toString();
+          }
+        }
+      } catch (e) {
+        console.error(e);
       }
-    }
+    });
   };
 
   const spankbang = _ => {
-    // TODO: never redirect, just update the URLs
-
-    if (!p.endsWith('/tags') && !p.includes('/playlist/') && !(params.has('q') && params.has('d'))) {
-      if (p === '/') {
-        url.pathname = '/trending_videos/'
+    document.body.querySelectorAll('a').forEach(link => {
+      try {
+        const url = new URL(link.href);
+        const params = url.searchParams;
+        const p = url.pathname;
+        if (!p.endsWith('/tags') && !p.includes('/playlist/') && !(params.has('q') && params.has('d'))) {
+          if (p === '/') {
+            url.pathname = '/trending_videos/'
+          }
+          params.set('q', 'fhd');
+          params.set('d', MIN_DURATION_MINS);
+          link.href = url.toString();
+        }
+      } catch (e) {
+        console.error(e);
       }
-      params.set('q', 'fhd');
-      params.set('d', MIN_DURATION_MINS);
-      newUrl = url.toString();
-    }
+    });
   };
 
   const porntrex = _ => {
-    const expectedPage = (page, href) => href.startsWith(`https://www.porntrex.com/${page}/`) && (page === 'top-rated' || href.split('/').length > 5);
+    const expectedPage = (page, href) =>
+      href.startsWith(`https://www.porntrex.com/${page}/`) && (page === 'top-rated' || href.split('/').length > 5);
 
-    [...document.body.querySelectorAll('a')]
-      .filter(i => !!['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, i.href)))
-      .forEach(i => {
-        try {
-          const url = new URL(i.href);
-          const ps = url.pathname.split('/').filter(i => i.length > 0);
-          for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
-            if (!ps.includes(i)) {
-              ps.push(i);
-            }
+    document.body.querySelectorAll('a').forEach(link => {
+      try {
+        if (!['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, link.href))) return;
+
+        const url = new URL(link.href);
+        const ps = url.pathname.split('/').filter(i => i.length > 0);
+        for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
+          if (!ps.includes(i)) {
+            ps.push(i);
           }
-          ps.push('');
-          ps.unshift('');
-          url.pathname = ps.join('/');
-          i.href = url.toString();
-        } catch (e) {
-          console.error(i.href, e);
         }
-      });
+        ps.push('');
+        ps.unshift('');
+        url.pathname = ps.join('/');
+        link.href = url.toString();
+      } catch (e) {
+        console.error(link.href, e);
+      }
+    });
   };
 
   const xhamster = _ => {
-    // TODO: never redirect, just update the URLs
-
-    if (p.startsWith('/search/')) {
-      if (params.get('length') !== 'full') {
-        params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
-        params.set('length', 'full');
-        newUrl = url.toString();
+    document.body.querySelectorAll('a').forEach(link => {
+      try {
+        const url = new URL(link.href);
+        const params = url.searchParams;
+        const p = url.pathname;
+        if (p.startsWith('/search/')) {
+          if (params.get('length') !== 'full') {
+            params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
+            params.set('length', 'full');
+            link.href = url.toString();
+          }
+        } else if (p.startsWith('/categories/') || p.startsWith('/channels/')) {
+          if (!p.includes('/hd/')) {
+            link.href = `${url}/hd/full-length/best?quality=${MIN_VIDEO_HEIGHT}p`;
+          }
+        } else if (p === '/') {
+          link.href = `${url}/hd/full-length/best/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
+        }
+      } catch (e) {
+        console.error(link.href, e);
       }
-    } else if (p.startsWith('/categories/') || p.startsWith('/channels/')) {
-      if (!p.includes('/hd/')) {
-        newUrl = `${url}/hd/full-length/best?quality=${MIN_VIDEO_HEIGHT}p`;
-      }
-    } else if (p === '/') {
-      newUrl = `${url}/hd/full-length/best/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
-    }
+    });
   };
 
   if (h === 'www.pornhub.com') {
@@ -429,11 +449,5 @@
     porntrex();
   } else if (h === 'xhamster.com') {
     xhamster();
-  }
-
-  // TODO: remove?
-  if (newUrl) {
-    window.stop();
-    window.location.replace(newUrl);
   }
 })()
