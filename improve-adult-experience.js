@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.12
+// @version 0.13
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @match https://spankbang.com/*
 // @match https://www.pornhub.com/*
@@ -17,6 +17,8 @@
   // TODO: DRY links
 
   const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if UI appears to be broken somehow
+  const AUTOPLAY = true;
+
   const MIN_DURATION_MINS = 20;
   const MIN_VIDEO_HEIGHT = 1080;
 
@@ -27,6 +29,10 @@
   const h = url.hostname;
   const p = url.pathname;
   const valid = link => link.href.startsWith(url.origin);
+  const err = (e, node) => {
+    console.log(node);
+    console.error(e);
+  };
 
   const currentTime = () => Math.round(Date.now() / 1000);
   const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
@@ -35,7 +41,7 @@
   const timeToSeconds = time => (time || '').trim().split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 
   const simulateClick = (document, node) => {
-    console.log('simulateClick');
+    console.log('simulateClick', node);
     try {
       if (!node) return;
       const rect = node.getBoundingClientRect();
@@ -45,7 +51,7 @@
       ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
         .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
     } catch (e) {
-      console.error(e);
+      err(e, node);
     }
   };
 
@@ -61,17 +67,27 @@
 
   const pornhub = _ => {
     const UNWANTED = '__unwanted';
-    // TODO: collect garbage
     const loadUnwanted = () => JSON.parse(localStorage.getItem(UNWANTED)) || {};
     const setUnwanted = (url, ttl) => {
       const id = videoId(url);
       if (!id) return;
       const unwanted = loadUnwanted();
       if (!unwanted[id]) {
-        localStorage.setItem(UNWANTED, JSON.stringify({ ...unwanted, [id]: ttl }))
+        localStorage.setItem(UNWANTED, JSON.stringify({ ...unwanted, [id]: ttl }));
       }
     };
-    const isUnwanted = url => currentTime() < loadUnwanted()[videoId(url)];
+    const isUnwanted = url => {
+      const id = videoId(url);
+      if (!id) return false;
+      const unwanted = loadUnwanted();
+      const ttl = unwanted[id];
+      const result = currentTime() < ttl;
+      if (!result && ttl) {
+        delete unwanted[id];
+        localStorage.setItem(UNWANTED, JSON.stringify(unwanted));
+      }
+      return result;
+    };
     const videoId = url => url.searchParams.get('viewkey') || url.pathname.split('/').slice(-1)[0];
     const watchedVideos = new Set;
 
@@ -142,7 +158,9 @@
         console.error(e);
       }
 
-      video.addEventListener('loadstart', _ => simulateClick(document, body.querySelector('div.mgp_playIcon')));
+      if (AUTOPLAY) {
+        video.addEventListener('loadstart', _ => simulateClick(document, body.querySelector('div.mgp_playIcon')));
+      }
       video.addEventListener('loadedmetadata', _ => {
         if (disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
@@ -332,7 +350,18 @@
   };
 
   const xvideos = _ => {
-    const searchInput = document.body.querySelector('input.search-input[type="text"], input[placeholder="Search X videos"], input[type="text"]');
+    const body = document.body;
+    body
+      .querySelectorAll('video')
+      .forEach(i => {
+        if (AUTOPLAY) {
+          i.addEventListener('loadeddata', _ => body.querySelector('div.big-button.play').click());
+        }
+        i.addEventListener('loadedmetadata', _ => i.currentTime = random(i.duration / 4, i.duration / 3));
+        i.load();
+      });
+
+    const searchInput = body.querySelector('input.search-input[type="text"], input[placeholder="Search X videos"], input[type="text"]');
     const searchForm = searchInput?.closest('form');
     searchForm?.addEventListener('submit', event => {
       event.preventDefault();
@@ -372,38 +401,84 @@
             }
           }
         } catch (e) {
-          console.error(e);
+          err(e, node);
         }
+        return;
       }
       node.childNodes.forEach(processLink);
     };
 
-    subscribeOnChanges(document.body, processLink);
+    subscribeOnChanges(body, processLink);
   };
 
   const spankbang = _ => {
-    // TODO: search?
-    document.body.querySelectorAll('a').forEach(link => {
-      try {
-        const url = new URL(link.href);
-        const params = url.searchParams;
-        const p = url.pathname;
-        if (!p.endsWith('/tags') && !p.includes('/playlist/') && !(params.has('q') && params.has('d'))) {
-          if (p === '/') {
-            url.pathname = '/trending_videos/'
-          }
-          params.set('q', 'fhd');
-          params.set('d', MIN_DURATION_MINS);
-          link.href = url.toString();
+    const body = document.body;
+    body
+      .querySelectorAll('video')
+      .forEach(i => {
+        if (AUTOPLAY) {
+          i.addEventListener('loadeddata', _ => body.querySelector('span.i-play#play-button').click());
         }
-      } catch (e) {
-        console.error(e);
+        i.addEventListener('loadedmetadata', _ => i.currentTime = random(i.duration / 4, i.duration / 3));
+        i.load();
+      });
+
+    // TODO
+    /*const searchInput = body.querySelector('input#search-input[type="text"], input[type="text"]');
+    const searchForm = searchInput?.closest('form');
+    //body.querySelector('button#search-button, button[type="submit"]')?.addEventListener('click', event => {
+    searchForm?.addEventListener('submit', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const query = (searchInput.value || '').trim();
+      if (query.length === 0) return;
+
+      const url = new URL(`${window.location.origin}/s/${query}/`);
+      const params = url.searchParams;
+      params.set('d', MIN_DURATION_MINS);
+      params.set('q', 'uhd');
+      window.location.href = url.toString();
+    }, true);*/
+
+    const processLink = node => {
+      if (node.nodeType !== 1) return;
+      if (node.tagName === 'A') {
+        try {
+          if (!valid(node)) return;
+
+          const url = new URL(node.href);
+          const params = url.searchParams;
+          const p = url.pathname;
+          if (!p.endsWith('/tags') && !p.includes('/playlist/') && !(params.has('q') && params.has('d'))) {
+            if (p === '/') {
+              url.pathname = '/trending_videos/'
+            }
+            params.set('q', 'uhd');
+            params.set('d', MIN_DURATION_MINS);
+            node.href = url.toString();
+          }
+        } catch (e) {
+          err(e, node);
+        }
+        return;
       }
-    });
+      node.childNodes.forEach(processLink);
+    };
+
+    body.querySelectorAll('a').forEach(processLink);
+    subscribeOnChanges(body, processLink);
   };
 
   const porntrex = _ => {
     const body = document.body;
+    body
+      .querySelectorAll('video')
+      .forEach(i => {
+        i.addEventListener('loadedmetadata', _ => i.currentTime = random(i.duration / 4, i.duration / 3));
+        i.load();
+      });
+
     const searchInput = body.querySelector('input[type="text"][name="q"]'); // TODO
     body.querySelector('button[type="submit"][aria-label="search"], button[type="submit"]')?.addEventListener('click', event => {
       event.preventDefault();
@@ -438,19 +513,20 @@
             node.href = `${node.href}top-rated/thirty-all-min/`;
           }
         } catch (e) {
-          console.error(e);
+          err(e, node);
         }
+        return;
       }
-
       node.childNodes.forEach(processLink);
     };
 
     body.querySelectorAll('a').forEach(processLink);
-    subscribeOnChanges(document.body, processLink);
+    subscribeOnChanges(body, processLink);
   };
 
   const xhamster = _ => {
-    const searchInput = document.body.querySelector('input[name="q"][type="text"], input[type="text"]');
+    const body = document.body;
+    const searchInput = body.querySelector('input[name="q"][type="text"], input[type="text"]');
     const searchForm = searchInput?.closest('form');
     searchForm?.querySelector('button.search-submit[type="submit"], button[type="submit"]')?.addEventListener('click', event => {
       event.preventDefault();
@@ -467,31 +543,43 @@
       window.location.href = url.toString();
     }, true);
 
-    // TODO: suggest?
-    document.body.querySelectorAll('a').forEach(link => {
-      try {
-        if (!valid(link)) return;
+    const processLink = node => {
+      if (node.nodeType !== 1) return;
+      if (node.tagName === 'A') {
+        try {
+          if (!valid(node)) return;
 
-        const url = new URL(link.href);
-        const params = url.searchParams;
-        const p = url.pathname;
-        if (p.startsWith('/search/')) {
-          if (params.get('length') !== 'full') {
-            params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
-            params.set('length', 'full');
-            link.href = url.toString();
+          const url = new URL(node.href);
+          const params = url.searchParams;
+          const p = url.pathname;
+          if (p.startsWith('/search/')) {
+            if (params.get('length') !== 'full') {
+              params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
+              params.set('length', 'full');
+              node.href = url.toString();
+            }
+          } else if (p.startsWith('/categories/') || p.startsWith('/channels/')) {
+            if (!p.includes('/hd/')) {
+              node.href = `${url}/hd/full-length/best?quality=${MIN_VIDEO_HEIGHT}p`;
+            }
+          } else if (p === '/') {
+            node.href = `${url}/hd/full-length/best/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
           }
-        } else if (p.startsWith('/categories/') || p.startsWith('/channels/')) {
-          if (!p.includes('/hd/')) {
-            link.href = `${url}/hd/full-length/best?quality=${MIN_VIDEO_HEIGHT}p`;
-          }
-        } else if (p === '/') {
-          link.href = `${url}/hd/full-length/best/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
+        } catch (e) {
+          err(e, node);
         }
-      } catch (e) {
-        console.error(link.href, e);
+        return;
+      } else if (node.tagName === 'VIDEO') {
+        // TODO: node.addEventListener('loadeddata', _ => setTimeout(_ => simulateClick(document, body.querySelector('div.play-inner')), 5000));
+        node.addEventListener('loadedmetadata', _ => node.currentTime = random(node.duration / 4, node.duration / 3));
+        node.load();
+        return;
       }
-    });
+      node.childNodes.forEach(processLink);
+    };
+
+    body.querySelectorAll('a').forEach(processLink);
+    subscribeOnChanges(body, processLink);
   };
 
   if (h === 'www.pornhub.com') {
