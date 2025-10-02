@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set best quality and duration filters by default, make unwanted video previews transparent, do fallbacks in case of load failures
-// @version 0.9
+// @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @exclude-match https://spankbang.com/*/video/*
 // @match https://spankbang.com/*
@@ -20,6 +20,7 @@
 
   // TODO: improve resistance to exceptions
 
+  const MINOR_IMPROVEMENTS = true; // NOTE: try to turn these off in case if UI is somehow broke for you
   const MIN_DURATION_MINS = 20;
   const MIN_VIDEO_HEIGHT = 1080;
 
@@ -251,7 +252,7 @@
       style.innerHTML = `
         div.${UNWANTED}, li.${UNWANTED} { opacity: 10%; }
         div.${UNWANTED}:hover, li.${UNWANTED}:hover { opacity: 40%; }
-        #searchSuggestions a:focus { background-color: #111111; }
+        ${MINOR_IMPROVEMENTS ? `#searchSuggestions a:focus { background-color: #111111; }` : ''}
       `;
       body.appendChild(style);
     } catch (e) {
@@ -274,6 +275,30 @@
       url.searchParams.set('search', query);
       window.location.href = url.toString();
     }, true);
+
+    if (MINOR_IMPROVEMENTS && searchInput) {
+      document.addEventListener('keydown', event => {
+        if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+        if (document.activeElement === searchInput) {
+          if (event.key !== 'Escape') return;
+
+          event.preventDefault();
+          setTimeout(_ => {
+            searchInput.blur();
+            body.querySelector('div.container')?.click();
+          }, 200);
+        } else if (['/','s', 'S'].includes(event.key)) {
+          event.preventDefault();
+          searchInput.focus();
+        }
+      });
+
+      setTimeout(_ => {
+        searchInput.blur();
+        body.querySelector('div.container')?.click();
+      }, 400);
+    }
 
     if (p.startsWith('/embed/')) {
       // this branch gets selected for both iframed and redirected embedded player
@@ -406,7 +431,7 @@
     xhamster();
   }
 
-  // TODO: remove
+  // TODO: remove?
   if (newUrl) {
     window.stop();
     window.location.replace(newUrl);
