@@ -1,15 +1,19 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.js
 // ==/UserScript==
+
+// TODO: remove frame and mic animation dots
 
 (_ => {
   'use strict';
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
-  if (!document.head.querySelector('meta[itemprop="name"][content="Jitsi Meet"]')) return;
+  if (!document.head?.querySelector('meta[itemprop="name"][content="Jitsi Meet"]')) return;
+  const b = document.body;
+  if (!b) return;
 
   const hide = node => node.style.display = 'none';
 
@@ -37,5 +41,5 @@
       .observe(node, { childList: true, subtree: true });
   };
 
-  subscribeOnChanges(document.body, process);
+  subscribeOnChanges(b, process);
 })();

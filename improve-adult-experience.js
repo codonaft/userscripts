@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures
+// @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.13
+// @version 0.14
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @match https://spankbang.com/*
 // @match https://www.pornhub.com/*
@@ -14,8 +14,6 @@
 (_ => {
   'use strict';
 
-  // TODO: DRY links
-
   const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if UI appears to be broken somehow
   const AUTOPLAY = true;
 
@@ -24,11 +22,14 @@
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
+  const UNWANTED = '__unwanted';
+
+  const origin = window.location.origin;
   const url = new URL(window.location.href);
   const params = url.searchParams;
   const h = url.hostname;
   const p = url.pathname;
-  const valid = link => link.href.startsWith(url.origin);
+  const validLink = node => node?.tagName === 'A' && node?.href.startsWith(url.origin);
   const err = (e, node) => {
     console.log(node);
     console.error(e);
@@ -42,8 +43,8 @@
 
   const simulateClick = (document, node) => {
     console.log('simulateClick', node);
+    if (!node) return;
     try {
-      if (!node) return;
       const rect = node.getBoundingClientRect();
       const clientX = rect.x + rect.width / 2;
       const clientY = rect.y + rect.height / 2;
@@ -56,17 +57,25 @@
   };
 
   const subscribeOnChanges = (node, f) => {
-    try {
-      f(node);
-      new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(f)))
-        .observe(node, { childList: true, subtree: true });
-    } catch (e) {
-      console.error(e);
-    }
+    const g = node => {
+      const children = node?.querySelectorAll?.('a, div, li, span, var, video') || [];
+      [node, ...children].forEach(i => {
+        if (i?.nodeType !== 1) return;
+        try {
+          f(i);
+        } catch (e) {
+          err(e, node);
+        }
+      });
+    };
+
+    g(node);
+
+    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(g)))
+      .observe(node, { childList: true, subtree: true });
   };
 
   const pornhub = _ => {
-    const UNWANTED = '__unwanted';
     const loadUnwanted = () => JSON.parse(localStorage.getItem(UNWANTED)) || {};
     const setUnwanted = (url, ttl) => {
       const id = videoId(url);
@@ -90,6 +99,7 @@
     };
     const videoId = url => url.searchParams.get('viewkey') || url.pathname.split('/').slice(-1)[0];
     const watchedVideos = new Set;
+    const similarVideos = new Set;
 
     const disliked = body => !!body.querySelector('div.active[data-title="I Dislike This"]');
     const premiumRedirect = node => node.href.startsWith('javascript:');
@@ -101,7 +111,7 @@
       't': 'm',
     });
 
-    const processEmbedded = (document, similarVideos) => {
+    const processEmbedded = document => {
       const body = document.body;
       try {
         const css = `
@@ -145,10 +155,13 @@
             return;
           }
 
-          if (similarVideos.length > 0) {
+          if (similarVideos.size > 0) {
             console.log('redirecting to a random non-unwanted similar video');
-            const newSimilarVideos = similarVideos.filter(i => !watchedVideos.has(i));
-            window.location.href = newSimilarVideos.length > 0 ? pickRandom(newSimilarVideos) : pickRandom(similarVideos);
+            const newSimilarVideos = similarVideos.difference(watchedVideos);
+            const href = pickRandom(newSimilarVideos.size > 0 ? [...newSimilarVideos] : [...similarVideos]);
+            if (href) {
+              window.location.href = href;
+            }
           } else {
             console.log('giving up');
           }
@@ -159,7 +172,11 @@
       }
 
       if (AUTOPLAY) {
-        video.addEventListener('loadstart', _ => simulateClick(document, body.querySelector('div.mgp_playIcon')));
+        video.addEventListener('loadstart', _ => {
+          if (video.paused) {
+            simulateClick(document, body.querySelector('div.mgp_playIcon'));
+          }
+        });
       }
       video.addEventListener('loadedmetadata', _ => {
         if (disliked(body)) {
@@ -187,80 +204,64 @@
     const body = document.body;
 
     const processPreview = node => {
+      if (node.tagName === 'LI') {
+        node = node.querySelector('a')?.querySelector('var.duration');
+      }
+      const duration = ['VAR', 'SPAN'].includes(node.tagName) && node.classList.contains('duration') && timeToSeconds(node.textContent);
+      if (!duration) return;
+
+      const link = node?.closest('a');
+      if (!link) return;
+
+      const premium = premiumRedirect(link);
+      if (!premium) {
+        const t = random(duration / 4, duration / 3);
+        link.href += `&t=${t}`;
+      }
+
+      const container = link.closest('div.phimage')?.parentNode || link.closest('li');
+      if (premium || duration < MIN_DURATION_MINS * 60 || isUnwanted(new URL(link.href))) {
+        container?.classList.add(UNWANTED);
+      } else {
+        if (link.querySelector('div.watchedVideoText')) {
+          watchedVideos.add(link.href);
+        }
+        similarVideos.add(link.href);
+      }
+    };
+
+    subscribeOnChanges(body, node => {
       try {
-        const link = node.closest('a');
-        if (!link) return;
-
-        const duration = timeToSeconds(node.textContent);
-        const premium = premiumRedirect(link);
-        if (!premium) {
-          const t = random(duration / 4, duration / 3);
-          link.href += `&t=${t}`;
-        }
-
-        const container = link.closest('div.phimage')?.parentNode || link.closest('li');
-        if (premium || duration < MIN_DURATION_MINS * 60 || isUnwanted(new URL(link.href))) {
-          container?.classList.add(UNWANTED);
-        } else {
-          if (link.querySelector('div.watchedVideoText')) {
-            watchedVideos.add(link.href);
-          }
-          return link.href;
-        }
-      } catch (e) {
-        console.log(e);
-      }
-    };
-
-    const processPlaylistItem = node => {
-      if (node.nodeType !== 1) return;
-      if (node.tagName === 'SPAN' && node.classList.contains('duration')) {
         processPreview(node);
-        return;
+      } catch (e) {
+        err(e, node);
       }
-      node.childNodes.forEach(processPlaylistItem);
-    };
 
-    const processLink = node => {
-      if (node.nodeType !== 1) return;
-      if (node.tagName === 'A') {
-        try {
-          if (premiumRedirect(node) || node.closest('ul.filterListItem')) return;
-          const url = new URL(node.href.startsWith('https:') ? node.href : `${window.location.origin}${node.href}`);
-          const params = url.searchParams;
-          const p = url.pathname;
-          const parts = p.split('/');
-          if (['/video', '/video/search'].includes(p) || p.startsWith('/categories/')) {
-            searchFilterParams.forEach(([key, value]) => params.set(key, value));
-          } else if (p.startsWith('/pornstar/')) {
-            if (parts.length === 3) {
-              url.pathname = [...parts, 'videos', 'upload'].join('/');
-            } else if (!p.endsWith('/videos/upload')) {
-              return;
-            }
-            params.set('o', 'lg');
-          } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
-            if (parts.length === 3) {
-              url.pathname = [...parts, 'videos'].join('/');
-            } else if (!p.endsWith('/videos')) {
-              return;
-            }
-            params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
-          }
-          setTimeout(_ => node.href = url.toString(), 500);
-        } catch (e) {
-          console.error(node.href, e);
+      if (!validLink(node) || premiumRedirect(node) || node.closest('ul.filterListItem')) return;
+
+      const url = new URL(node.href.startsWith('https:') ? node.href : `${origin}${node.href}`);
+      const params = url.searchParams;
+      const p = url.pathname;
+      const parts = p.split('/');
+      if (['/video', '/video/search'].includes(p) || p.startsWith('/categories/')) {
+        searchFilterParams.forEach(([key, value]) => params.set(key, value));
+      } else if (p.startsWith('/pornstar/')) {
+        if (parts.length === 3) {
+          url.pathname = [...parts, 'videos', 'upload'].join('/');
+        } else if (!p.endsWith('/videos/upload')) {
+          return;
         }
-        return;
+        params.set('o', 'lg');
+      } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
+        if (parts.length === 3) {
+          url.pathname = [...parts, 'videos'].join('/');
+        } else if (!p.endsWith('/videos')) {
+          return;
+        }
+        params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
       }
-      node.childNodes.forEach(processLink);
-    };
-
-    const similarVideos = [...body.querySelectorAll('var.duration')]
-      .map(i => processPreview(i))
-      .filter(i => i);
-    subscribeOnChanges(body, processPlaylistItem);
-    subscribeOnChanges(body, processLink);
+      setTimeout(_ => node.href = url.toString(), 500);
+    });
 
     try {
       const style = document.createElement('style');
@@ -295,7 +296,8 @@
       document.addEventListener('keydown', event => {
         if (event.ctrlKey || event.altKey || event.metaKey) return;
 
-        if (document.activeElement !== searchInput && ['/','s', 'S'].includes(event.key)) {
+        // TODO: f = fullscreen, space = pause
+        if (document.activeElement !== searchInput && '/sS'.includes(event.key)) {
           event.preventDefault();
           searchInput.focus();
         }
@@ -306,7 +308,7 @@
       // this branch gets selected for both iframed and redirected embedded player
       setTimeout(_ => {
         console.log('processing embedded');
-        processEmbedded(document, similarVideos); // document is a part of iframe here
+        processEmbedded(document); // document is a part of iframe here
       }, 1000);
     } else if (p === '/view_video.php') {
       const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
@@ -330,7 +332,7 @@
           const iframe = document.createElement('iframe');
           iframe.onload = _ => {
             console.log('processing embedded video from onload');
-            processEmbedded(iframe.contentWindow.document, similarVideos);
+            processEmbedded(iframe.contentWindow.document);
           };
           iframe.referrerpolicy = 'no-referrer';
           iframe.width = '100%';
@@ -355,7 +357,11 @@
       .querySelectorAll('video')
       .forEach(i => {
         if (AUTOPLAY) {
-          i.addEventListener('loadeddata', _ => body.querySelector('div.big-button.play').click());
+          i.addEventListener('loadeddata', _ => {
+            if (i.paused) {
+              body.querySelector('div.big-button.play')?.click();
+            }
+          });
         }
         i.addEventListener('loadedmetadata', _ => i.currentTime = random(i.duration / 4, i.duration / 3));
         i.load();
@@ -379,36 +385,55 @@
       window.location.href = url.toString();
     }, true);
 
-    const processLink = node => {
-      if (node.nodeType !== 1) return;
-      if (node.tagName === 'A') {
-        try {
-          if (!valid(node) || node.closest('div.search-filters')) return;
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover { opacity: 40%; }
+        a.premium { display: none !important; }
+      `;
+      body.appendChild(style);
+    } catch (e) {
+      console.error(e);
+    }
 
-          const url = new URL(node.href);
-          const params = url.searchParams;
-          const p = url.pathname;
-          if (p === '/' && params.has('k') && !params.has('quality')) {
-            params.set('sort', 'rating');
-            params.set('durf', `${MIN_DURATION_MINS}min_more`);
-            params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
-            node.href = url.toString();
-          } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
-            const ps = p.split('/');
-            if (ps.length >= 3) {
-              url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
-              node.href = url.toString();
-            }
+    subscribeOnChanges(body, node => {
+      try {
+        if (node.matches('span.video-hd-mark, span.video-sd-mark')) {
+          const inside = node.closest('div.thumb-inside, div.video-thumb');
+          const under = inside?.parentNode?.querySelector('div.thumb-under, div.video-under');
+          const duration = under?.querySelector('span.duration')?.textContent;
+          const tooShort = !duration?.includes('h') && Number(duration?.split(' min')[0] || 0) < MIN_DURATION_MINS;
+          const tooSmall = (Number(node.textContent.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT;
+          if (tooShort || tooSmall) {
+            under?.classList.add(UNWANTED);
+            inside?.classList.add(UNWANTED);
           }
-        } catch (e) {
-          err(e, node);
+          return;
         }
-        return;
+      } catch (e) {
+        err(e, node);
       }
-      node.childNodes.forEach(processLink);
-    };
 
-    subscribeOnChanges(body, processLink);
+      if (!validLink(node) || node.closest('div.search-filters')) return;
+
+      const url = new URL(node.href);
+      const params = url.searchParams;
+      const p = url.pathname;
+      if (p === '/' && params.has('k') && !params.has('quality')) {
+        params.set('sort', 'rating');
+        params.set('durf', `${MIN_DURATION_MINS}min_more`);
+        params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
+        node.href = url.toString();
+        return;
+      } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
+        const ps = p.split('/');
+        if (ps.length >= 3) {
+          url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
+          node.href = url.toString();
+        }
+      }
+    });
   };
 
   const spankbang = _ => {
@@ -416,12 +441,32 @@
     body
       .querySelectorAll('video')
       .forEach(i => {
-        if (AUTOPLAY) {
-          i.addEventListener('loadeddata', _ => body.querySelector('span.i-play#play-button').click());
-        }
-        i.addEventListener('loadedmetadata', _ => i.currentTime = random(i.duration / 4, i.duration / 3));
+        i.addEventListener('loadeddata', _ => {
+          console.log('loadeddata');
+          if (AUTOPLAY && i.paused) {
+            body.querySelector('button[title="Play"]')?.click();
+          }
+        });
+        i.addEventListener('loadedmetadata', _ => {
+          console.log('loadedmetadata');
+          i.currentTime = random(i.duration / 4, i.duration / 3)
+          if (AUTOPLAY && i.paused) {
+            body.querySelector('span.i-play#play-button')?.click();
+          }
+        });
         i.load();
       });
+
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover { opacity: 40%; }
+      `;
+      body.appendChild(style);
+    } catch (e) {
+      console.error(e);
+    }
 
     // TODO
     /*const searchInput = body.querySelector('input#search-input[type="text"], input[type="text"]');
@@ -434,52 +479,49 @@
       const query = (searchInput.value || '').trim();
       if (query.length === 0) return;
 
-      const url = new URL(`${window.location.origin}/s/${query}/`);
+      const url = new URL(`${origin}/s/${query}/`);
       const params = url.searchParams;
       params.set('d', MIN_DURATION_MINS);
-      params.set('q', 'uhd');
+      params.set('q', 'fhd');
       window.location.href = url.toString();
     }, true);*/
 
-    const processLink = node => {
-      if (node.nodeType !== 1) return;
-      if (node.tagName === 'A') {
-        try {
-          if (!valid(node)) return;
-
-          const url = new URL(node.href);
-          const params = url.searchParams;
-          const p = url.pathname;
-          if (!p.endsWith('/tags') && !p.includes('/playlist/') && !(params.has('q') && params.has('d'))) {
-            if (p === '/') {
-              url.pathname = '/trending_videos/'
-            }
-            params.set('q', 'uhd');
-            params.set('d', MIN_DURATION_MINS);
-            node.href = url.toString();
+    subscribeOnChanges(body, node => {
+      try {
+        if (node.matches('span[data-testid="video-item-length"]')) {
+          const duration = Number(node.textContent.split('m')[0]) || 0;
+          if (duration < MIN_DURATION_MINS) {
+            node.closest('div[data-testid="video-item"]')?.classList.add(UNWANTED);
           }
-        } catch (e) {
-          err(e, node);
+          return;
         }
-        return;
+      } catch (e) {
+        console.error(e);
       }
-      node.childNodes.forEach(processLink);
-    };
 
-    body.querySelectorAll('a').forEach(processLink);
-    subscribeOnChanges(body, processLink);
+      if (!validLink(node)) return;
+
+      const url = new URL(node.href);
+      const params = url.searchParams;
+      const p = url.pathname;
+      if (!p.endsWith('/tags') && !p.includes('/playlist/') && !p.includes('/video/') && !(params.has('q') && params.has('d'))) {
+        if (p === '/') {
+          url.pathname = '/trending_videos/'
+        }
+        params.set('q', 'fhd');
+        params.set('d', MIN_DURATION_MINS);
+        node.href = url.toString();
+      }
+    });
   };
 
   const porntrex = _ => {
     const body = document.body;
-    body
-      .querySelectorAll('video')
-      .forEach(i => {
-        i.addEventListener('loadedmetadata', _ => i.currentTime = random(i.duration / 4, i.duration / 3));
-        i.load();
-      });
+    const minDuration = 'thirty-all-min';
+    const topRated = 'top-rated';
+    const ending = `${topRated}/${minDuration}/`;
 
-    const searchInput = body.querySelector('input[type="text"][name="q"]'); // TODO
+    const searchInput = body.querySelector('input[type="text"][placeholder="Search"], input[type="text"][name="q"]');
     body.querySelector('button[type="submit"][aria-label="search"], button[type="submit"]')?.addEventListener('click', event => {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -487,41 +529,59 @@
       const query = (searchInput.value || '').trim();
       if (query.length === 0) return;
 
-      window.location.href = `${window.location.origin}/search/${query}/top-rated/thirty-all-min/`;
+      window.location.href = `${origin}/search/${query}/${ending}`;
     }, true);
 
-    const expectedPage = (page, href) =>
-      href.startsWith(`https://www.porntrex.com/${page}/`) && (page === 'top-rated' || href.split('/').length > 5);
-
-    const processLink = node => {
-      if (node.nodeType !== 1) return;
-      if (node.tagName === 'A') {
-        try {
-          if (['categories', 'channels', 'models', 'top-rated'].find(page => expectedPage(page, node.href))) {
-            const url = new URL(node.href);
-            const ps = url.pathname.split('/').filter(i => i.length > 0);
-            for (const i of ['hd', 'top-rated', 'thirty-all-min']) {
-              if (!ps.includes(i)) {
-                ps.push(i);
-              }
-            }
-            ps.push('');
-            ps.unshift('');
-            url.pathname = ps.join('/');
-            node.href = url.toString();
-          } else if (node.href.startsWith(`${window.location.origin}/search/`) && !node.href.includes('/top-rated/thirty-all-min/')) {
-            node.href = `${node.href}top-rated/thirty-all-min/`;
-          }
-        } catch (e) {
-          err(e, node);
-        }
-        return;
+    /*if (MINOR_IMPROVEMENTS) {
+      try {
+        console.log('applying style');
+        const style = document.createElement('style');
+        style.innerHTML = 'div.sort-holder { display: none !important; }';
+        body.appendChild(style);
+      } catch (e) {
+        console.error(e);
       }
-      node.childNodes.forEach(processLink);
-    };
+    }*/
 
-    body.querySelectorAll('a').forEach(processLink);
-    subscribeOnChanges(body, processLink);
+    let initializedVideo = false;
+    const processNode = node => {
+      if (validLink(node)) {
+        const href = node.href;
+        if (href.includes('/video/')) return;
+        if (href.includes('/models/') && href.length === origin.length + '/models/a/'.length) return;
+        if ([`/${ending}`, '/channels/', '/tags/'].find(i => href.endsWith(i))) return;
+        if (node.closest('div.sort')) return;
+
+        if (href.includes('/search/')) {
+          node.href = `${href}/${ending}`;
+        } else if (['categories', 'channels', 'models', 'tags'].find(i => href.includes(`/${i}/`))) {
+          node.href = `${href.replace('/hd/', '/')}hd/${ending}`;
+        } else if (href === `${origin}/${topRated}/`) {
+          node.href = `${origin}/hd/${ending}`;
+        } else if (['latest-updates', 'most-commented', 'most-favourited', 'most-popular'].find(i => [`${origin}/${i}/`, `${origin}/hd/${i}/`].includes(href))) {
+          node.href = `${origin.replace('/hd/', '/')}/hd${node.href.split(origin)[1]}${minDuration}/`;
+        }
+      } else if (!initializedVideo && node.tagName === 'VIDEO') {
+        console.log('processing video');
+        initializedVideo = true;
+        node.addEventListener('loadeddata', _ => {
+          console.log('loadeddata');
+          if (AUTOPLAY && node.paused) {
+            body.querySelector('div.big-button.play')?.click();
+          }
+        });
+        node.addEventListener('loadedmetadata', _ => {
+          console.log('loadedmetadata');
+          node.currentTime = random(node.duration / 4, node.duration / 3);
+        });
+        node.load();
+      }
+    };
+    subscribeOnChanges(body, processNode);
+
+    if (AUTOPLAY) {
+      body.querySelector('a.fp-play')?.click();
+    }
   };
 
   const xhamster = _ => {
@@ -535,7 +595,7 @@
       const query = (searchInput.value || '').trim();
       if (query.length === 0) return;
 
-      const url = new URL(`${window.location.origin}/search/${query}`);
+      const url = new URL(`${origin}/search/${query}`);
       const params = url.searchParams;
       params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
       params.set('min-duration', '20');
@@ -543,43 +603,59 @@
       window.location.href = url.toString();
     }, true);
 
-    const processLink = node => {
-      if (node.nodeType !== 1) return;
-      if (node.tagName === 'A') {
-        try {
-          if (!valid(node)) return;
+    try {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover { opacity: 40%; }
+      `;
+      body.appendChild(style);
+    } catch (e) {
+      console.error(e);
+    }
 
-          const url = new URL(node.href);
-          const params = url.searchParams;
-          const p = url.pathname;
-          if (p.startsWith('/search/')) {
-            if (params.get('length') !== 'full') {
-              params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
-              params.set('length', 'full');
-              node.href = url.toString();
-            }
-          } else if (p.startsWith('/categories/') || p.startsWith('/channels/')) {
-            if (!p.includes('/hd/')) {
-              node.href = `${url}/hd/full-length/best?quality=${MIN_VIDEO_HEIGHT}p`;
-            }
-          } else if (p === '/') {
-            node.href = `${url}/hd/full-length/best/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
-          }
-        } catch (e) {
-          err(e, node);
+    const best = 'hd/full-length/best';
+    let initializedVideo = false;
+    subscribeOnChanges(body, node => {
+      if (node.matches('div[data-role="video-duration"]')) {
+        // FIXME
+        if (timeToSeconds(node.textContent) < MIN_DURATION_MINS * 60) {
+          node.closest('div.video-thumb, div.thumb-list__item')?.classList.add(UNWANTED);
         }
-        return;
-      } else if (node.tagName === 'VIDEO') {
-        // TODO: node.addEventListener('loadeddata', _ => setTimeout(_ => simulateClick(document, body.querySelector('div.play-inner')), 5000));
-        node.addEventListener('loadedmetadata', _ => node.currentTime = random(node.duration / 4, node.duration / 3));
+      } else if (validLink(node)) {
+        const url = new URL(node.href);
+        const params = url.searchParams;
+        const p = url.pathname;
+        if (p.startsWith('/search/')) {
+          if (params.get('length') !== 'full') {
+            params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
+            params.set('length', 'full');
+            node.href = url.toString();
+          }
+        } else if (p === '/' || ['/categories/', '/channels/'].find(i => p.startsWith(i))) {
+          node.href = `${node.href.replace(/\/hd$/, '/')}/${best}/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
+        }
+      } else if (!initializedVideo && node.tagName === 'VIDEO') {
+        initializedVideo = true;
+        node.addEventListener('loadeddata', _ => {
+          console.log('loadeddata');
+          /*if (AUTOPLAY && node.paused) {
+            if (node.paused) {
+              console.log('still paused');
+              body.querySelector('div.play-inner')?.click();
+            }
+          }*/
+        });
+        node.addEventListener('loadedmetadata', _ => {
+          console.log('loadedmetadata');
+          node.currentTime = random(node.duration / 4, node.duration / 3)
+          /*if (AUTOPLAY && node.paused) {
+            body.querySelector('div.xplayer-start-button')?.click();
+          }*/
+        });
         node.load();
-        return;
       }
-      node.childNodes.forEach(processLink);
-    };
-
-    body.querySelectorAll('a').forEach(processLink);
-    subscribeOnChanges(body, processLink);
+    });
   };
 
   if (h === 'www.pornhub.com') {
@@ -593,4 +669,4 @@
   } else if (h === 'xhamster.com') {
     xhamster();
   }
-})()
+})();

@@ -2,7 +2,7 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.js
 // ==/UserScript==
 
@@ -11,7 +11,8 @@
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
   const b = document.body;
-  if (!document.head.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
+  if (!b) return;
+  if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 
   const hasResults = (b.querySelector('td.response-time') || !b.querySelector('td.response-error')) && !b.querySelector('div.dialog-error-block')?.innerText.includes('No results were found');
   if (hasResults) return;
@@ -54,4 +55,4 @@
   const params = url.searchParams.toString();
   url.search = '';
   window.location.replace(`${url.toString()}#${params}`);
-})()
+})();

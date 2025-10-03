@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.7
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.qwen.ai/*
@@ -40,6 +40,12 @@
       return;
     }
 
+    if (node.matches?.('div.age-popup-btns > #okButton') && node.textContent.includes('18 or older')) {
+      observer.disconnect();
+      node.click();
+      return;
+    }
+
     if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent.includes('Continue without disabling')) {
       observer.disconnect();
       node.parentElement.click();
@@ -64,18 +70,21 @@
 
     if (node.matches?.('#modalWrapMTubes')) {
       observer.disconnect();
-      setTimeout(_ => {
-        document.body.querySelectorAll('#modalWrapMTubes > div > div > button').forEach(i => i.click());
-      }, randomPause(100, 400));
+      setTimeout(
+        _ => node.querySelectorAll('div > div > button').forEach(i => i.click()),
+        randomPause(100, 400)
+      );
       return;
     }
 
     if (node.matches?.('div.disclaimer_message')) {
-      node.querySelectorAll('span')?.forEach(i => {
+      observer.disconnect();
+      node.querySelectorAll('span').forEach(i => {
         if (i.textContent.includes('I am 18 years')) {
           i?.closest('button').click();
         }
       });
+      return;
     }
 
     node.childNodes.forEach(n => process(n, observer));

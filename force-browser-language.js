@@ -16,4 +16,4 @@
      url.searchParams.set('hl', lang);
      window.location.replace(url.toString());
    }
-})()
+})();

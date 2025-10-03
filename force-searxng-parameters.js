@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.js
 // ==/UserScript==
 
@@ -10,7 +10,8 @@
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
   const b = document.body;
-  if (!document.head.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
+  if (!b) return;
+  if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 
   const form = b.querySelector('form#search');
   if (!form) return;
@@ -28,4 +29,4 @@
     input.value = v;
     form.appendChild(input);
   });
-})()
+})();
