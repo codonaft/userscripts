@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.14
+// @version 0.15
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @match https://spankbang.com/*
 // @match https://www.pornhub.com/*
@@ -464,6 +464,10 @@
         div.${UNWANTED}:hover { opacity: 40%; }
       `;
       body.appendChild(style);
+
+      if (MINOR_IMPROVEMENTS) {
+        body.querySelectorAll('div[x-data="gifPage"]').forEach(i => i.style.display = 'none');
+      }
     } catch (e) {
       console.error(e);
     }
@@ -488,7 +492,7 @@
 
     subscribeOnChanges(body, node => {
       try {
-        if (node.matches('span[data-testid="video-item-length"]')) {
+        if (node.matches('span[data-testid="video-item-length"], div[data-testid="video-item-length"]')) {
           const duration = Number(node.textContent.split('m')[0]) || 0;
           if (duration < MIN_DURATION_MINS) {
             node.closest('div[data-testid="video-item"]')?.classList.add(UNWANTED);
@@ -515,7 +519,6 @@
     });
   };
 
-  // TODO: unwanted
   const porntrex = _ => {
     const body = document.body;
     const minDuration = 'thirty-all-min';
@@ -533,20 +536,29 @@
       window.location.href = `${origin}/search/${query}/${ending}`;
     }, true);
 
-    /*if (MINOR_IMPROVEMENTS) {
-      try {
-        console.log('applying style');
-        const style = document.createElement('style');
-        style.innerHTML = 'div.sort-holder { display: none !important; }';
-        body.appendChild(style);
-      } catch (e) {
-        console.error(e);
-      }
-    }*/
+    try {
+      console.log('applying style');
+      const style = document.createElement('style');
+      style.innerHTML = `
+        div.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover { opacity: 40%; }
+      `;
+      // TODO: div.sort-holder { display: none !important; } ?
+      body.appendChild(style);
+    } catch (e) {
+      console.error(e);
+    }
 
     let initializedVideo = false;
     const processNode = node => {
-      if (validLink(node)) {
+      const unwanted = (node.matches('span.quality') && (Number(node.textContent.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT) || (node.matches('div.durations') && timeToSeconds(node.textContent) < MIN_DURATION_MINS * 60);
+      if (unwanted) {
+        node.closest('div.thumb-item')?.classList.add(UNWANTED);
+      } else if (node.matches('div.durations')) {
+        if (timeToSeconds(node.textContent) < MIN_DURATION_MINS * 60) {
+          node.closest('div.thumb-item')?.classList.add(UNWANTED);
+        }
+      } else if (validLink(node)) {
         const href = node.href;
         if (href.includes('/video/')) return;
         if (href.includes('/models/') && href.length === origin.length + '/models/a/'.length) return;
