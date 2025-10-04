@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.8
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
+// @match https://chat.deepseek.com/*
 // @match https://chat.qwen.ai/*
 // @match https://chatgpt.com/*
+// @match https://hqporner.com/*
 // @match https://pmvhaven.com/*
 // @match https://www.cvedetails.com/*
 // @match https://www.pornhub.com/*
@@ -59,6 +61,17 @@
 
     if (node.tagName === 'BUTTON' && (node.getAttribute('data-role') === 'parental-control-confirm-button' || node.textContent.includes('Stay logged out'))) {
       setTimeout(_ => node.click(), randomPause(1000, 1500));
+      return;
+    }
+
+    if (node.matches?.('div#cookie-banner')) {
+      observer.disconnect();
+      node.querySelector('a#accept-essential')?.click();
+      return;
+    }
+
+    if (node.matches?.('button[role="button"] > span') && node.textContent === 'Continue') {
+      node.closest('button')?.click();
       return;
     }
 
