@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality and duration filters, make unwanted video previews transparent, do fallbacks in case of load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
 // @version 0.14
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
@@ -515,6 +515,7 @@
     });
   };
 
+  // TODO: unwanted
   const porntrex = _ => {
     const body = document.body;
     const minDuration = 'thirty-all-min';
@@ -669,4 +670,5 @@
   } else if (h === 'xhamster.com') {
     xhamster();
   }
+  // TODO: consider xnxx.com, redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, anysex.com, xgroovy.com, pmvhaven.com, pornhits.com, vxxx.com, manysex.com, inporn.com, hqporner.com, beeg.com, bingato.com, taboodude.com
 })();

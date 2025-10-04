@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.9
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -10,6 +10,7 @@
 // @match https://pmvhaven.com/*
 // @match https://www.cvedetails.com/*
 // @match https://www.pornhub.com/*
+// @match https://www.xnxx.com/*
 // @match https://www.xvideos.com/*
 // @match https://xhamster.com/*
 // ==/UserScript==
@@ -94,9 +95,10 @@
       observer.disconnect();
       node.querySelectorAll('span').forEach(i => {
         if (i.textContent.includes('I am 18 years')) {
-          i?.closest('button').click();
+          i?.closest('button')?.click();
         }
       });
+      node.querySelectorAll('button.current-main-cat').forEach(i => i.click());
       return;
     }
 
