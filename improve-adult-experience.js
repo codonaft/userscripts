@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.15
+// @version 0.16
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // @match https://spankbang.com/*
 // @match https://www.pornhub.com/*
@@ -462,12 +462,9 @@
       style.innerHTML = `
         div.${UNWANTED} { opacity: 10%; }
         div.${UNWANTED}:hover { opacity: 40%; }
+        ${MINOR_IMPROVEMENTS ? 'div[x-data="gifPage"] { display: none; }' : ''}
       `;
       body.appendChild(style);
-
-      if (MINOR_IMPROVEMENTS) {
-        body.querySelectorAll('div[x-data="gifPage"]').forEach(i => i.style.display = 'none');
-      }
     } catch (e) {
       console.error(e);
     }
@@ -540,8 +537,8 @@
       console.log('applying style');
       const style = document.createElement('style');
       style.innerHTML = `
-        div.${UNWANTED} { opacity: 10%; }
-        div.${UNWANTED}:hover { opacity: 40%; }
+        div.${UNWANTED}, span.${UNWANTED} { opacity: 10%; }
+        div.${UNWANTED}:hover, div.${UNWANTED}:hover { opacity: 40%; }
       `;
       // TODO: div.sort-holder { display: none !important; } ?
       body.appendChild(style);
@@ -551,13 +548,9 @@
 
     let initializedVideo = false;
     const processNode = node => {
-      const unwanted = (node.matches('span.quality') && (Number(node.textContent.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT) || (node.matches('div.durations') && timeToSeconds(node.textContent) < MIN_DURATION_MINS * 60);
+      const unwanted = (node.matches('span.quality') && (Number(node.textContent.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT) || (node.matches('div.durations, span.video-item-duration') && timeToSeconds(node.textContent) < MIN_DURATION_MINS * 60);
       if (unwanted) {
-        node.closest('div.thumb-item')?.classList.add(UNWANTED);
-      } else if (node.matches('div.durations')) {
-        if (timeToSeconds(node.textContent) < MIN_DURATION_MINS * 60) {
-          node.closest('div.thumb-item')?.classList.add(UNWANTED);
-        }
+        (node.closest('div.thumb-item') || node.closest('span.video-item')?.querySelector('span.thumb'))?.classList.add(UNWANTED);
       } else if (validLink(node)) {
         const href = node.href;
         if (href.includes('/video/')) return;
