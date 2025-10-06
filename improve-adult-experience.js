@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com, txxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.17
+// @version 0.18
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // ==/UserScript==
 
@@ -26,7 +26,7 @@
   const params = url.searchParams;
   const h = url.hostname;
   const p = url.pathname;
-  const validLink = node => node?.tagName === 'A' && node?.href.startsWith(url.origin);
+  const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(url.origin);
   const err = (e, node) => {
     console.log(node);
     console.error(e);
@@ -35,6 +35,7 @@
   const currentTime = () => Math.round(Date.now() / 1000);
   const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
   const pickRandom = xs => xs[random(0, xs.length)];
+  const refresh = () => window.location.href = window.location.toString();
 
   const timeToSeconds = time => (time || '').trim().split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 
@@ -110,7 +111,7 @@
         return;
       }
 
-      if (node.tagName === 'A' && (!validLink(node)) || (shouldHideLink && shouldHideLink(node.href))) {
+      if (node.tagName === 'A' && (!validLink(node)) || (node.href && shouldHideLink?.(node.href))) {
         node.classList.add(HIDE);
         return;
       }
@@ -123,7 +124,7 @@
         err(e, node);
       }
 
-      const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration(node.textContent)) || (isUnwantedUrl && validLink(node) && isUnwantedUrl(new URL(node.href)));
+      const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(new URL(node.href)));
       if (unwanted) {
         const thumbnail = node.closest(thumbnailSelector);
         const thumbnails = node.closest(thumbnailSelector)?.parentNode?.querySelectorAll(thumbnailSelector);
@@ -137,9 +138,11 @@
       }
 
       if (initializedVideo || !node.matches('video')) return;
-      console.log('detected video');
 
-      if (thumbnailSelector && (node.matches(thumbnailSelector) || node.closest(thumbnailSelector))) return;
+      const audioTracks = [...node.querySelectorAll('source')].filter(i => i.type?.startsWith?.('audio/'));
+      if (audioTracks.length === 0) return;
+
+      console.log('detected video with audio', node);
 
       ['loadstart', 'loadedmetadata', 'loadeddata', 'seeked', 'play'].forEach(i => {
         node.addEventListener(i, _ => {
@@ -278,7 +281,7 @@
           const requiresRefresh = body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page');
           if (requiresRefresh) {
             console.log('refreshing after error');
-            window.location.href = window.location.toString();
+            refresh();
           }
         } catch (e) {
           console.error(e);
