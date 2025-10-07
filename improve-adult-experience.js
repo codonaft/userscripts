@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, spankbang.com, porntrex.com, xhamster.com, txxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.18
+// @version 0.19
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // ==/UserScript==
 
@@ -10,7 +10,7 @@
   'use strict';
 
   const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if UI appears to be broken somehow
-  const AUTOPLAY = true; // NOTE: requires --autoplay-policy=no-user-gesture-required
+  const AUTOPLAY = true; // NOTE: requires --autoplay-policy=no-user-gesture-required in chromium-like browsers
 
   const MIN_DURATION_MINS = 20;
   const MIN_VIDEO_HEIGHT = 1080;
@@ -22,20 +22,18 @@
 
   const body = document.body;
   const origin = window.location.origin;
-  const url = new URL(window.location.href);
-  const params = url.searchParams;
-  const h = url.hostname;
-  const p = url.pathname;
-  const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(url.origin);
+  const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
+  const redirect = href => window.location.href = href;
+  const refresh = _ => redirect(window.location.toString());
+
   const err = (e, node) => {
     console.log(node);
     console.error(e);
   };
 
-  const currentTime = () => Math.round(Date.now() / 1000);
+  const currentTime = _ => Math.round(Date.now() / 1000);
   const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
   const pickRandom = xs => xs[random(0, xs.length)];
-  const refresh = () => window.location.href = window.location.toString();
 
   const timeToSeconds = time => (time || '').trim().split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 
@@ -79,12 +77,14 @@
       shouldSetRandomPosition,
       css,
       playSelector,
+      videoSelector,
       thumbnailSelector,
       qualitySelector,
       durationSelector,
       isUnwantedQuality,
       isUnwantedDuration,
       isUnwantedUrl,
+      isVideoUrl,
       shouldHideLink,
       processNode,
     } = args || { shouldSetRandomPosition: true };
@@ -102,11 +102,61 @@
       console.error(e);
     }
 
-    let initializedVideo = false;
     let usedToPlayOrIsPlaying = false;
+    const playIfPaused = (playButton, video) => {
+      if (usedToPlayOrIsPlaying || !video.paused) return;
+
+      if (video.matches('video.jw-video')) {
+        console.log('starting jwplayer');
+        try {
+          video.play();
+          return;
+        } catch (e) {
+          err(e, video);
+        }
+      }
+
+      console.log('clicking on play button', playButton, 'for the video', video);
+      //simulateClick(document, playButton);
+      try {
+        playButton.click();
+      } catch (e) {
+        err(e, playButton);
+      }
+
+      setTimeout(_ => {
+        if (usedToPlayOrIsPlaying || !video.paused) return;
+        const rect = video.getBoundingClientRect();
+        const offset = rect.width * 0.02;
+        const clientX = rect.x + offset;
+        const clientY = rect.y + rect.height - offset;
+        const cornerPlayButton = document.elementFromPoint(clientX, clientY);
+        if (cornerPlayButton && cornerPlayButton !== video) {
+          console.log('fallback to corner play button', cornerPlayButton);
+          try {
+            cornerPlayButton.click();
+          } catch (e) {
+            err(e, cornerPlayButton);
+          }
+        } else {
+          console.log('fallback to play method', video);
+          try {
+            video.play();
+          } catch (e) {
+            err(e, video);
+          }
+        }
+      }, 1000);
+    };
+
+    let initializedVideo = false;
     subscribeOnChanges(body, node => {
-      if (AUTOPLAY && !usedToPlayOrIsPlaying && playSelector && node.matches(playSelector)) {
-        console.log('detected play button');
+      const url = new URL(window.location.href);
+      const p = url.pathname;
+      const isVideoPage = p !== '/' && (!isVideoUrl || isVideoUrl(p));
+
+      if (AUTOPLAY && !usedToPlayOrIsPlaying && isVideoPage && playSelector && !videoSelector && node.matches(playSelector) && !body.querySelector('video')) {
+        console.log('detected play button while there is no video node yet', node);
         setTimeout(_ => node.click(), 1);
         return;
       }
@@ -114,14 +164,6 @@
       if (node.tagName === 'A' && (!validLink(node)) || (node.href && shouldHideLink?.(node.href))) {
         node.classList.add(HIDE);
         return;
-      }
-
-      try {
-        if (processNode) {
-          processNode(node);
-        }
-      } catch (e) {
-        err(e, node);
       }
 
       const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(new URL(node.href)));
@@ -137,12 +179,16 @@
         return;
       }
 
-      if (initializedVideo || !node.matches('video')) return;
+      try {
+        if (processNode) {
+          processNode(node);
+        }
+      } catch (e) {
+        err(e, node);
+      }
 
-      const audioTracks = [...node.querySelectorAll('source')].filter(i => i.type?.startsWith?.('audio/'));
-      if (audioTracks.length === 0) return;
-
-      console.log('detected video with audio', node);
+      if (initializedVideo || !isVideoPage || !node.matches(videoSelector || 'video')) return;
+      console.log('detected main video', node);
 
       ['loadstart', 'loadedmetadata', 'loadeddata', 'seeked', 'play'].forEach(i => {
         node.addEventListener(i, _ => {
@@ -154,59 +200,21 @@
       })
 
       node.addEventListener('play', _ => {
-        console.log('play');
+        console.log('playback is initiated');
         usedToPlayOrIsPlaying = true;
       });
 
       node.addEventListener('playing', _ => {
-        console.log('playing')
-        node.focus(); // TODO: if visible?
+        console.log('playback is started')
+        node.focus(); // TODO: if observed on the page?
       });
 
       if (AUTOPLAY) {
         console.log('setting autoplay');
 
         node.addEventListener('loadstart', _ => {
-          if (usedToPlayOrIsPlaying || !node.paused) return;
-
-          console.log('first seek');
           const playButton = body.querySelector(playSelector) || node;
-          //simulateClick(document, playButton);
-          try {
-            playButton.click();
-          } catch (e) {
-            err(e, playButton);
-          }
-
-          setTimeout(_ => {
-            if (usedToPlayOrIsPlaying || !node.paused) return;
-            const rect = node.getBoundingClientRect();
-            const offset = rect.width * 0.025;
-            const clientX = rect.x + offset;
-            const clientY = rect.y + rect.height - offset;
-            const cornerPlayButton = document.elementFromPoint(clientX, clientY);
-            if (cornerPlayButton) {
-              console.log('fallback to play button');
-              try {
-                cornerPlayButton.click();
-              } catch (e) {
-                err(e, cornerPlayButton);
-              }
-            } else {
-              console.log('fallback to play method');
-              try {
-                node.play();
-              } catch (e) {
-                err(e, node);
-              }
-            }
-
-            setTimeout(_ => {
-              if (usedToPlayOrIsPlaying || !node.paused) return;
-              console.log('retrying play method');
-              node.play();
-            }, 10);
-          }, 10);
+          playIfPaused(playButton, node);
         });
       }
 
@@ -217,12 +225,16 @@
   };
 
   // TODO: consider xnxx.com, redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, anysex.com, xgroovy.com, pmvhaven.com, pornhits.com, vxxx.com, manysex.com, inporn.com, hqporner.com, beeg.com, bingato.com, taboodude.com
-  const shortDomain = h.replace(/^www\./, '');
+  const shortDomain = window.location.hostname.replace(/^www\./, '');
   ({
     'pornhub.com': _ => {
       const DURATION_SELECTOR = 'var.duration, span.duration';
 
-      const loadUnwanted = () => JSON.parse(localStorage.getItem(UNWANTED)) || {};
+      const url = new URL(window.location.href);
+      const params = url.searchParams;
+      const p = url.pathname;
+
+      const loadUnwanted = _ => JSON.parse(localStorage.getItem(UNWANTED)) || {};
       const setUnwanted = (url, ttl) => {
         const id = videoId(url);
         if (!id) return;
@@ -244,6 +256,7 @@
         return result;
       };
       const videoId = url => url.searchParams.get('viewkey') || url.pathname.split('/').slice(-1)[0];
+      const isVideoUrl = href => href.includes('/view_video.php');
       const watchedVideos = new Set;
       const similarVideos = new Set;
 
@@ -296,7 +309,7 @@
             if (!isUnwanted(url)) {
               console.log('making single refresh attempt');
               setUnwanted(url, currentTime() + 60 * 60);
-              window.location = url.toString();
+              redirect(url.toString());
               return;
             }
 
@@ -305,7 +318,7 @@
               const newSimilarVideos = similarVideos.difference(watchedVideos);
               const href = pickRandom(newSimilarVideos.size > 0 ? [...newSimilarVideos] : [...similarVideos]);
               if (href) {
-                window.location.href = href;
+                redirect(href);
               }
             } else {
               console.log('giving up');
@@ -355,9 +368,8 @@
         if (!duration) return;
 
         const link = node?.closest('a');
-        if (!link) return;
+        if (!link || !isVideoUrl(link.href)) return;
 
-        const container = link.closest('div.phimage')?.parentNode || link.closest('li');
         const t = random(duration / 4, duration / 3);
         link.href += `&t=${t}`;
 
@@ -370,10 +382,12 @@
       init({
         shouldSetRandomPosition: false,
         css: '#searchSuggestions a:focus { background-color: #111111 !important; }',
+        videoSelector: 'video:not(.gifVideo)',
         thumbnailSelector: 'div.phimage, li:has(span.info-wrapper)',
         durationSelector: DURATION_SELECTOR,
         isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
         isUnwantedUrl: url => isUnwanted(url),
+        isVideoUrl,
         shouldHideLink: href => href.includes('/gif/'),
         processNode: node => {
           try {
@@ -423,7 +437,7 @@
         const url = new URL(searchForm.action);
         searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
         url.searchParams.set('search', query);
-        window.location.href = url.toString();
+        redirect(url.toString());
       }, true);
 
       if (MINOR_IMPROVEMENTS && searchInput) {
@@ -444,7 +458,7 @@
           console.log('processing embedded');
           processEmbedded(document); // document is a part of iframe here
         }, 1000);
-      } else if (p === '/view_video.php') {
+      } else if (isVideoUrl(p)) {
         const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
         if (durationFromNormalPlayer) {
           const lowQuality = ![...body.querySelectorAll('ul.mgp_quality > li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
@@ -479,7 +493,7 @@
           } else {
             console.log('player not found, redirecting to embedded player');
             window.stop();
-            window.location.href = embedUrl;
+            redirect(embedUrl);
           }
         }
       }
@@ -498,7 +512,7 @@
         const query = (searchInput.value || '').trim();
         if (query.length === 0) return;
 
-        window.location.href = `${origin}/search/${query}/${ending}`;
+        redirect(`${origin}/search/${query}/${ending}`);
       }, true);
 
       init({
@@ -548,7 +562,7 @@
         const params = url.searchParams;
         params.set('d', MIN_DURATION_MINS);
         params.set('q', 'fhd');
-        window.location.href = url.toString();
+        redirect(url.toString());
       }, true);*/
 
       init({
@@ -559,6 +573,7 @@
           div.positions-wrapper { display: none !important; }
         `,
         playSelector: 'span.i-play#play-button',
+        videoSelector: 'div#video video',
         thumbnailSelector: 'div[data-testid="video-item"]',
         durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
         isUnwantedDuration: text => (Number(text.split('m')[0]) || 0) < MIN_DURATION_MINS,
@@ -590,7 +605,7 @@
         durationSelector: 'div[class="labels"]',
         isUnwantedQuality: text => !text.startsWith(hd),
         isUnwantedDuration: text => timeToSeconds(text.split(hd)[1]) < MIN_DURATION_MINS * 60,
-        processNode: node => {
+        processNode: _node => {
           // TODO: https://txxx.com/categories/big-butt/1/?sort=most-popular&date=all&type=hd&duration=2
         },
       });
@@ -611,7 +626,7 @@
         params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
         params.set('min-duration', '20');
         params.set('length', 'full');
-        window.location.href = url.toString();
+        redirect(url.toString());
       }, true);
 
       const best = 'hd/full-length/best';
@@ -656,7 +671,7 @@
         params.set('durf', `${MIN_DURATION_MINS}min_more`);
         params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
         url.searchParams.set('k', query);
-        window.location.href = url.toString();
+        redirect(url.toString());
       }, true);
 
       init({
