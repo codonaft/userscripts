@@ -2,14 +2,16 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.21
+// @version 0.22
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // ==/UserScript==
 
 (_ => {
   'use strict';
 
-  const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if UI appears to be broken somehow
+  const IGNORE_HOSTS = []; // NOTE: without 'www.', e.g. 'xvideos.com'
+  const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if some UI appears to be broken
+
   const AUTOPLAY = true; // NOTE: requires --autoplay-policy=no-user-gesture-required in chromium-like browsers
   const HIDE_EXTERNAL_LINKS = true;
   const RANDOM_POSITION = true;
@@ -24,7 +26,7 @@
 
   const body = document.body;
   const origin = window.location.origin;
-  const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
+  const validLink = node => node?.tagName === 'A' && (node?.href?.length === 0 || node?.href?.startsWith(origin));
   const redirect = href => window.location.href = href;
   const refresh = _ => redirect(window.location);
 
@@ -192,7 +194,7 @@
         }
       }
 
-      if (HIDE_EXTERNAL_LINKS && node.tagName === 'A' && !validLink(node)) {
+      if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && !validLink(node)) {
         node.classList.add(HIDE);
         return;
       }
@@ -238,32 +240,33 @@
       }
 
       const url = new URL(window.location.href);
-      const p = url.pathname;
-      const videoPage = p !== '/' && (!isVideoUrl || isVideoUrl(p));
+      const videoPage = url.pathname !== '/' && (!isVideoUrl || isVideoUrl(url.href));
 
-      if (AUTOPLAY && !playbackInitiated && videoPage && playSelector && !videoSelector && node.matches(playSelector) && !body.querySelector('video')) {
-        console.log('detected play button while there is no video node yet', node);
-        setTimeout(_ => node.click(), 1);
-        return;
-      }
-
-      const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(new URL(node.href)));
-      if (unwanted) {
-        const thumbnail = node.closest(thumbnailSelector);
-        const thumbnails = node.closest(thumbnailSelector)?.parentNode?.querySelectorAll(thumbnailSelector);
-        if (thumbnails.length > 0 && thumbnails?.length <= 2) {
-          // xvideos
-          thumbnails?.forEach(i => i.classList.add(UNWANTED));
-        } else {
-          thumbnail?.classList.add(UNWANTED);
+      try {
+        if (AUTOPLAY && !playbackInitiated && videoPage && playSelector && !videoSelector && node.matches(playSelector) && !body.querySelector('video')) {
+          console.log('detected play button while there is no video node yet', node);
+          setTimeout(_ => node.click(), 1);
+          return;
         }
-        return;
+
+        const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(new URL(node.href)));
+        if (unwanted) {
+          const thumbnail = node.closest(thumbnailSelector);
+          const thumbnails = node.closest(thumbnailSelector)?.parentNode?.querySelectorAll(thumbnailSelector);
+          if (thumbnails.length > 0 && thumbnails?.length <= 2) {
+            // xvideos
+            thumbnails?.forEach(i => i.classList.add(UNWANTED));
+          } else {
+            thumbnail?.classList.add(UNWANTED);
+          }
+          return;
+        }
+      } catch (e) {
+        err(e, node);
       }
 
       try {
-        if (processNode) {
-          processNode(node);
-        }
+        processNode?.(node);
       } catch (e) {
         err(e, node);
       }
@@ -337,15 +340,19 @@
     });
   };
 
-  // TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, beeg.com, bingato.com, taboodude.com
+  // TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com
   const shortDomain = window.location.hostname.replace(/^www\./, '');
+  if (IGNORE_HOSTS.includes(shortDomain)) {
+    console.log(shortDomain, 'is a part of ignore list');
+    return;
+  }
+
   ({
     'anysex.com': _ => {
-      const searchPrefix = `${origin}/search/?sort=top&q=`;
       const isVideoUrl = href => href.includes('/video/');
       init({
         searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"], input[type="text"]',
-        onSearch: (query, _form) => redirect(`${searchPrefix}${query}`),
+        onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${query}`),
         thumbnailSelector: 'div.item',
         qualitySelector: 'span.item-quality',
         durationSelector: 'div.duration',
@@ -353,11 +360,36 @@
         isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
         isVideoUrl,
         processNode: node => {
-          if (validLink(node) && !isVideoUrl(node.href)) {
-            const url = new URL(node.href);
-            const query = url.searchParams.get('q');
-            node.href = `${searchPrefix}${query}`;
-          }
+          if (!validLink(node) || node.closest('div.sort')) return;
+
+          const url = new URL(node.href);
+          if (url.pathname === '/') return;
+
+          url.searchParams.set('sort', 'top');
+          node.href = url;
+        },
+      });
+    },
+
+    'beeg.com': _ => {
+      const cookie = document.cookie;
+      const qualityPattern = 'video__quality=';
+      const quality = Number(cookie.split(qualityPattern)[1]?.split(';')[0]) || 0;
+      if (quality > 0 && quality < MIN_VIDEO_HEIGHT) {
+        console.log('wrong quality', quality);
+        document.cookie = `${qualityPattern}${MIN_VIDEO_HEIGHT}`;
+        refresh();
+        return;
+      }
+
+      const isVideoUrl = href => new URL(href).pathname !== '/';
+      init({
+        thumbnailSelector: 'div.tw-relative[data-testid="unit"]',
+        durationSelector: 'span[data-testid="unit-amount"]',
+        isUnwantedDuration: text => !text?.includes('FULL '),
+        isVideoUrl,
+        processNode: _node => {
+          // TODO
         },
       });
     },
@@ -680,6 +712,7 @@
 
     'txxx.com': _ => {
       const hd = 'HD';
+      const isVideoUrl = href => href.includes('/videos/');
       init({
         css: '.jw-hardlink-inner { display: none !important; }',
         searchInputSelector: 'div.search-input > input[type="text"][placeholder="Search by videos..."], input[type="text"][placeholder="Search by videos..."], input[type="text"]',
@@ -688,30 +721,30 @@
         durationSelector: 'div.labels',
         isUnwantedQuality: text => !text.startsWith(hd),
         isUnwantedDuration: text => timeToSeconds(text.split(hd)[1]) < MIN_DURATION_MINS * 60,
-        isVideoUrl: href => href.includes('/videos/'),
+        isVideoUrl,
         processNode: node => {
-          if (validLink(node)) {
-            const url = new URL(node.href);
-            const p = url.pathname;
-            const params = url.searchParams;
-            if (p.startsWith('/search/')) {
-              url.pathname = '/search/1/';
-              params.set('type', 'hd');
-              params.set('duration', '3');
-              node.href = url;
-            } else if (['/categories/', '/channel/', '/models/'].filter(i => p.startsWith(i).length > 0)) {
-              const parts = p.split('/');
-              if (parts.length >= 4) {
-                const action = parts[1];
-                const query = parts.slice(-2)[0];
-                if (query) {
-                  url.pathname = `/${action}/${query}/1/`;
-                  params.set('sort', p.startsWith('/categories/') ? 'top-rated' : 'longest');
-                  params.set('date', 'all');
-                  params.set('type', 'hd');
-                  params.set('duration', '2');
-                  node.href = url;
-                }
+          if (!validLink(node) || isVideoUrl(node.href)) return;
+
+          const url = new URL(node.href);
+          const p = url.pathname;
+          const params = url.searchParams;
+          if (p.startsWith('/search/')) {
+            url.pathname = '/search/1/';
+            params.set('type', 'hd');
+            params.set('duration', '3');
+            node.href = url;
+          } else if (['/categories/', '/channel/', '/models/'].filter(i => p.startsWith(i).length > 0)) {
+            const parts = p.split('/');
+            if (parts.length >= 4) {
+              const action = parts[1];
+              const query = parts.slice(-2)[0];
+              if (query) {
+                url.pathname = `/${action}/${query}/1/`;
+                params.set('sort', p.startsWith('/categories/') ? 'top-rated' : 'longest');
+                params.set('date', 'all');
+                params.set('type', 'hd');
+                params.set('duration', '2');
+                node.href = url;
               }
             }
           }
@@ -779,15 +812,15 @@
         // TODO: isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
         isVideoUrl: href => href.includes('/video-'),
         processNode: node => {
-          if (validLink(node)) {
-            const url = new URL(node.href);
-            const p = url.pathname;
-            if (p.startsWith('/search/')) {
-              const query = p.split('/').slice(-1);
-              url.pathname = `${searchPath}/${query}`;
-              url.search = '';
-              node.href = url.toString();
-            }
+          if (!validLink(node)) return;
+
+          const url = new URL(node.href);
+          const p = url.pathname;
+          if (p.startsWith('/search/')) {
+            const query = p.split('/').slice(-1);
+            url.pathname = `${searchPath}/${query}`;
+            url.search = '';
+            node.href = url.toString();
           }
         },
       });
