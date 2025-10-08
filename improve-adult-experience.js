@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.23
+// @version 0.24
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // ==/UserScript==
 
@@ -184,12 +184,12 @@
         }
       }, 200);
 
-      setTimeout(_ => clearInterval(fallbackInterval), 20000);
+      setTimeout(_ => clearInterval(fallbackInterval), 15000);
     };
 
     let lastHref = window.location.href;
     let focusInterval;
-    let allowGeneralAutoplay = true;
+    let disallowGeneralAutoplay = false;
     subscribeOnChanges(body, node => {
       const newHref = window.location.href;
       if (newHref !== lastHref) {
@@ -280,13 +280,13 @@
       }
 
       try {
-        allowGeneralAutoplay = processNode?.(node);
+        disallowGeneralAutoplay = !!processNode?.(node);
       } catch (e) {
         err(e, node);
       }
 
-      if (!allowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return;
-      // TODO: if (!allowGeneralAutoplay || initializedVideo || !videoPage) return;
+      if (disallowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return;
+      // TODO: if (disallowGeneralAutoplay || initializedVideo || !videoPage) return;
 
       const nonPreviewVideos = [...body.querySelectorAll('video')].filter(i => {
         const text = [...i.classList.values()].join(' ').toLowerCase();
@@ -411,7 +411,6 @@
     },
 
     'pornhub.com': _ => {
-      // FIXME: opens video on thumbnail hover
       const DURATION_SELECTOR = 'var.duration, span.duration';
 
       const url = new URL(window.location.href);
@@ -453,9 +452,9 @@
         't': 'm',
       });
 
-      let allowGeneralAutoplay = true;
+      let disallowGeneralAutoplay= false;
       const processEmbedded = document => {
-        allowGeneralAutoplay = false;
+        disallowGeneralAutoplay = true;
         const body = document.body;
         try {
           const css = 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important; }';
@@ -584,7 +583,7 @@
             err(e, node);
           }
 
-          if (!validLink(node) || node.closest('ul.filterListItem')) return allowGeneralAutoplay;
+          if (!validLink(node) || node.closest('ul.filterListItem')) return disallowGeneralAutoplay;
 
           const url = new URL(node.href.startsWith('https:') ? node.href : `${origin}${node.href}`);
           const params = url.searchParams;
@@ -596,19 +595,19 @@
             if (parts.length === 3) {
               url.pathname = [...parts, 'videos', 'upload'].join('/');
             } else if (!p.endsWith('/videos/upload')) {
-              return allowGeneralAutoplay;
+              return disallowGeneralAutoplay;
             }
             params.set('o', 'lg');
           } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
             if (parts.length === 3) {
               url.pathname = [...parts, 'videos'].join('/');
             } else if (!p.endsWith('/videos')) {
-              return allowGeneralAutoplay;
+              return disallowGeneralAutoplay;
             }
             params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
           }
           setTimeout(_ => node.href = url.toString(), 500);
-          return allowGeneralAutoplay;
+          return disallowGeneralAutoplay;
         },
       });
 
@@ -737,8 +736,6 @@
       init({
         css: '.jw-hardlink-inner { display: none !important; }',
         searchInputSelector: 'div.search-input > input[type="text"][placeholder="Search by videos..."], input[type="text"][placeholder="Search by videos..."], input[type="text"]',
-        //playSelector: 'button.jw-icon[aria-label="Play"]', // FIXME
-        //videoSelector: 'video.jw-video', // FIXME
         thumbnailSelector: 'div.thumb',
         qualitySelector: 'div.labels',
         durationSelector: 'div.labels',
