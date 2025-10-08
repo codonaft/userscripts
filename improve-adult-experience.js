@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.24
+// @version 0.25
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // ==/UserScript==
 
@@ -12,7 +12,7 @@
   const IGNORE_HOSTS = []; // NOTE: without 'www.', e.g. 'xvideos.com'
   const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if some UI appears to be broken
 
-  const AUTOPLAY = true; // NOTE: requires --autoplay-policy=no-user-gesture-required in chromium-like browsers
+  const AUTOPLAY = true; // NOTE: probably still requires --autoplay-policy=no-user-gesture-required in chromium-like browsers to work properly
   const HIDE_EXTERNAL_LINKS = true;
   const RANDOM_POSITION = true;
 
@@ -109,6 +109,7 @@
       isUnwantedUrl,
       isVideoUrl,
       refreshOnPageChange,
+      fatalFallback,
       processNode,
     } = args || {};
 
@@ -152,43 +153,60 @@
         err(e, playButton);
       }
 
-      const fallbackInterval = setInterval(_ => {
-        console.log('fallbackInterval');
-        if (playbackInitiated || !video.paused) {
-          clearInterval(fallbackInterval);
-          return;
+      if (playbackInitiated || !video.paused) {
+        return;
+      }
+      console.log('fallback');
+      const rect = video.getBoundingClientRect();
+      const offset = rect.width * 0.02;
+      const clientX = rect.x + offset;
+      const clientY = rect.y + rect.height - offset;
+      const cornerPlayButton = document.elementFromPoint(clientX, clientY);
+      if (cornerPlayButton && cornerPlayButton !== video && [...cornerPlayButton.attributes].filter(i => i.textContent.toLowerCase().includes('play')) > 0) {
+        console.log('fallback to corner play button', cornerPlayButton);
+        try {
+          cornerPlayButton.click();
+        } catch (e) {
+          err(e, cornerPlayButton);
         }
-        const rect = video.getBoundingClientRect();
-        const offset = rect.width * 0.02;
-        const clientX = rect.x + offset;
-        const clientY = rect.y + rect.height - offset;
-        const cornerPlayButton = document.elementFromPoint(clientX, clientY);
-        if (cornerPlayButton && cornerPlayButton !== video && [...cornerPlayButton.attributes].filter(i => i.textContent.toLowerCase().includes('play')) > 0) {
-          console.log('fallback to corner play button', cornerPlayButton);
-          try {
-            cornerPlayButton.click();
-            clearInterval(fallbackInterval);
-          } catch (e) {
-            err(e, cornerPlayButton);
-          }
-        } else if (loadedMetadata) {
-          console.log('fallback to play method', video);
-          try {
-            video.play();
-            clearInterval(fallbackInterval);
-          } catch (e) {
-            err(e, video);
-          }
-        } else {
-          console.log('fallback failure'); // FIXME: spankbang
+      } else if (loadedMetadata) {
+        console.log('fallback to play method', video);
+        try {
+          video.play();
+        } catch (e) {
+          err(e, video);
         }
-      }, 200);
+      } else {
+        console.log('fallback failure, perhaps main player is incorrectly selected, reloading');
+        try {
+          if (fatalFallback) {
+            console.log('calling fatal fallback');
+            fatalFallback();
+            return;
+          }
 
-      setTimeout(_ => clearInterval(fallbackInterval), 15000);
+          video.addEventListener('loadstart', _ => {
+            console.log('loadstart autoplay fallback');
+            if (RANDOM_POSITION) {
+              const duration = video.duration || (15 * 60);
+              const time = random(duration / 4, duration / 3);
+              console.log('fallback set random position', time);
+              video.currentTime = time;
+            }
+            playIfPaused(video);
+            video.muted = false;
+            playbackInitiated = true;
+          }, { once: true });
+
+          video.load();
+        } catch (e) {
+          err(e, video);
+        }
+      }
     };
 
     let lastHref = window.location.href;
-    let focusInterval;
+    //let focusInterval;
     let disallowGeneralAutoplay = false;
     subscribeOnChanges(body, node => {
       const newHref = window.location.href;
@@ -199,13 +217,13 @@
         loadedMetadata = false;
         playbackInitiated = false;
         playbackStarted = false;
-        if (focusInterval) {
-          clearInterval(focusInterval);
+        //if (focusInterval) {
+        //  clearInterval(focusInterval);
           if (refreshOnPageChange) {
             refreshWithNoHistory();
             return;
           }
-        }
+        //}
       }
 
       if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
@@ -216,7 +234,7 @@
       if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
         console.log('initializing search input');
         searchInputInitialized = true;
-        const searchInput = node.matches(searchInputSelector) ? node : document.querySelector(searchInputSelector);
+        const searchInput = node.matches(searchInputSelector) ? node : body.querySelector(searchInputSelector);
         if (!searchInput) {
           console.error('search input not found');
           return;
@@ -232,7 +250,7 @@
           }
         });
 
-        const formOrButton = document.querySelector(searchFormOrSubmitButtonSelector);
+        const formOrButton = body.querySelector(searchFormOrSubmitButtonSelector);
         const searchForm = formOrButton?.tagName === 'FORM' ? formOrButton : (node.closest('form') || formOrButton?.closest('form'));
 
         const handleSearch = event => {
@@ -267,7 +285,7 @@
         if (unwanted) {
           const thumbnail = node.closest(thumbnailSelector);
           const thumbnails = node.closest(thumbnailSelector)?.parentNode?.querySelectorAll(thumbnailSelector);
-          if (thumbnails.length > 0 && thumbnails?.length <= 2) {
+          if (thumbnails?.length > 0 && thumbnails?.length <= 2) {
             // xvideos
             thumbnails?.forEach(i => i.classList.add(UNWANTED));
           } else {
@@ -286,15 +304,16 @@
       }
 
       if (disallowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return;
-      // TODO: if (disallowGeneralAutoplay || initializedVideo || !videoPage) return;
 
       const nonPreviewVideos = [...body.querySelectorAll('video')].filter(i => {
         const text = [...i.classList.values()].join(' ').toLowerCase();
         return !i.hasAttribute('loop') && !text.includes('preview') && !text.includes('lazyload');
       });
-      const video = nonPreviewVideos
-        .filter(i => i.offsetHeight > 0)
-        .sort((a, b) => b.offsetHeight - a.offsetHeight)[0] || nonPreviewVideos[0] || body.querySelector(videoSelector);
+      const video = body.querySelector(videoSelector) || (
+         nonPreviewVideos
+          .filter(i => i.offsetHeight > 0)
+          .sort((a, b) => b.offsetHeight - a.offsetHeight)[0] || nonPreviewVideos[0]
+      );
       if (!video) {
         console.log('no video');
         return;
@@ -306,12 +325,16 @@
         video.addEventListener(i, _ => {
           console.log(i);
           if (RANDOM_POSITION && !playbackStarted && video.duration > 0 && video.currentTime === 0) {
+            console.log('set random position');
             video.currentTime = random(video.duration / 4, video.duration / 3)
           }
         });
       });
 
-      video.addEventListener('loadedmetadata', _ => loadedMetadata = true);
+      video.addEventListener('loadedmetadata', _ => {
+        loadedMetadata = true;
+        console.log('loadedmetadata, duration', video.duration);
+      });
 
       video.addEventListener('play', _ => {
         console.log('playback is initiated');
@@ -324,29 +347,26 @@
         video.focus();
       });
 
-      video.addEventListener('abort', _ => {
-        if (!loadedMetadata) {
-          console.log('abort, reloading');
-          video.load();
-        }
-      });
-
       video.addEventListener('stalled', refresh);
 
       if (AUTOPLAY) {
         console.log('setting autoplay');
-        video.addEventListener('loadstart', _ => playIfPaused(video));
+        video.addEventListener('loadstart', _ => {
+          console.log('loadstart autoplay');
+          playIfPaused(video);
+        }, { once: true });
       }
 
       if (MINOR_IMPROVEMENTS) {
         video.tabindex = -1;
-        focusInterval = setInterval(_ => {
+        // TODO: stop when page is not visible
+        /*focusInterval = setInterval(_ => {
           const active = document.activeElement;
           if (active !== video && active.tagName !== 'INPUT') {
             console.log('restore focus to player');
             video.focus({ preventScroll: true });
           }
-        }, 3000);
+        }, 3000);*/
       }
 
       initializedVideo = true;
@@ -411,7 +431,9 @@
     },
 
     'pornhub.com': _ => {
-      const DURATION_SELECTOR = 'var.duration, span.duration';
+      const playSelector = 'div.mgp_playIcon';
+      const videoSelector = 'video.mgp_videoElement:not(.gifVideo)';
+      const durationSelector = 'var.duration, span.duration';
 
       const url = new URL(window.location.href);
       const params = url.searchParams;
@@ -452,7 +474,60 @@
         't': 'm',
       });
 
-      let disallowGeneralAutoplay= false;
+      const fatalFallback = _ => {
+        console.log('fallback to embedded player');
+        const container = body.querySelector('div.playerFlvContainer');
+        try {
+          const normalPlayer = body.querySelector(videoSelector);
+          if (normalPlayer) {
+            console.log('normal player', normalPlayer.duration, normalPlayer.paused, normalPlayer);
+            setTimeout(_ => {
+              if (normalPlayer.paused) {
+                refresh();
+              }
+            }, 25000);
+            return;
+            /*if (!normalPlayer.paused) {
+              const playButton = body.querySelector(playSelector);
+              playButton?.click();
+              console.log('stopped the normal player with button', playButton);
+            }*/
+            //normalPlayer.volume = 0;
+            //normalPlayer.muted = true;
+            //if (isFinite(normalPlayer.duration)) {
+            //  normalPlayer.currentTime = normalPlayer.duration;
+            //  console.log('set normal player currentTime to end');
+            //}
+          }
+          //container?.querySelectorAll('*').forEach(i => i.classList.add(HIDE));
+          //console.log('stopped and hidden the original player');
+        } catch (e) {
+          console.error(e);
+        }
+
+        const embedUrl = `${origin}/embed/${params.get('viewkey')}`;
+        if (container) {
+          const iframe = document.createElement('iframe');
+          iframe.onload = _ => {
+            console.log('processing embedded video from onload');
+            processEmbedded(iframe.contentWindow.document);
+          };
+          iframe.referrerpolicy = 'no-referrer';
+          iframe.width = '100%';
+          iframe.height = '100%';
+          iframe.frameborder = '0';
+          iframe.scrolling = 'no';
+          iframe.allowfullscreen = '';
+          iframe.src = embedUrl;
+          container.appendChild(iframe);
+        } else {
+          console.log('player not found, redirecting to embedded player');
+          window.stop();
+          redirect(embedUrl);
+        }
+      };
+
+      let disallowGeneralAutoplay = false;
       const processEmbedded = document => {
         disallowGeneralAutoplay = true;
         const body = document.body;
@@ -511,10 +586,11 @@
           console.error(e);
         }
 
+        const playButton = body.querySelector(playSelector);
         if (AUTOPLAY) {
           video.addEventListener('loadstart', _ => {
             if (video.paused) {
-              simulateClick(document, body.querySelector('div.mgp_playIcon'));
+              simulateClick(document, playButton);
             }
           });
         }
@@ -527,12 +603,11 @@
         body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
           if (video.paused) {
             console.log('paused on grid menu');
-            const button = body.querySelector('div.mgp_playIcon');
-            simulateClick(document, button);
+            simulateClick(document, playButton);
             setTimeout(_ => {
               if (video.paused) {
                 console.log('still paused');
-                simulateClick(document, button);
+                simulateClick(document, playButton);
               }
             }, 500);
           }
@@ -546,7 +621,7 @@
           node = node.querySelector('a')?.querySelector('var.duration');
           if (!node) return;
         }
-        const duration = node.matches(DURATION_SELECTOR) && timeToSeconds(node.textContent);
+        const duration = node.matches(durationSelector) && timeToSeconds(node.textContent);
         if (!duration) return;
 
         const link = node?.closest('a');
@@ -570,12 +645,14 @@
           url.searchParams.set('search', query);
           redirect(url);
         },
-        videoSelector: 'video:not(.gifVideo)',
+        playSelector,
+        videoSelector,
         thumbnailSelector: 'div.phimage, li:has(span.info-wrapper)',
-        durationSelector: DURATION_SELECTOR,
+        durationSelector,
         isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
         isUnwantedUrl: url => isUnwanted(url),
         isVideoUrl,
+        fatalFallback,
         processNode: node => {
           try {
             processPreview(node);
@@ -619,6 +696,7 @@
         }, 1000);
       } else if (isVideoUrl(p)) {
         const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
+        const normalPlayer = body.querySelector(videoSelector);
         if (durationFromNormalPlayer) {
           const lowQuality = ![...body.querySelectorAll('ul.mgp_quality > li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
           console.log('low quality', lowQuality);
@@ -630,30 +708,19 @@
             window.stop();
             params.set('t', random(durationFromNormalPlayer / 4, durationFromNormalPlayer / 3));
             window.location.replace(url);
+          } else {
+            setTimeout(_ => {
+              const normalPlayer = body.querySelector(videoSelector);
+              const error = normalPlayer?.error;
+              if (!normalPlayer || error) {
+                console.log('normal player has failed anyway', error, normalPlayer);
+                fatalFallback();
+              }
+            }, 25000);
           }
         } else {
-          console.log('fallback to embedded player');
-          const embedUrl = `${origin}/embed/${params.get('viewkey')}`;
-          const container = body.querySelector('div.playerFlvContainer');
-          if (container) {
-            const iframe = document.createElement('iframe');
-            iframe.onload = _ => {
-              console.log('processing embedded video from onload');
-              processEmbedded(iframe.contentWindow.document);
-            };
-            iframe.referrerpolicy = 'no-referrer';
-            iframe.width = '100%';
-            iframe.height = '100%';
-            iframe.frameborder = '0';
-            iframe.scrolling = 'no';
-            iframe.allowfullscreen = '';
-            iframe.src = embedUrl;
-            container.appendChild(iframe);
-          } else {
-            console.log('player not found, redirecting to embedded player');
-            window.stop();
-            redirect(embedUrl);
-          }
+          console.log('no duration from normal player, calling fatal fallback');
+          fatalFallback();
         }
       }
     },
@@ -708,7 +775,7 @@
           redirect(url);
         },*/
         playSelector: 'span.i-play#play-button',
-        videoSelector: 'div#video video',
+        videoSelector: 'video#main_video_player_html5_api',
         thumbnailSelector: 'div[data-testid="video-item"]',
         durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
         isUnwantedDuration: text => (Number(text.split('m')[0]) || 0) < MIN_DURATION_MINS,
