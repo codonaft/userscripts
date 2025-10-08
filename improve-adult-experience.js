@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.22
+// @version 0.23
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.js
 // ==/UserScript==
 
@@ -26,9 +26,16 @@
 
   const body = document.body;
   const origin = window.location.origin;
-  const validLink = node => node?.tagName === 'A' && (node?.href?.length === 0 || node?.href?.startsWith(origin));
-  const redirect = href => window.location.href = href;
+  const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
+  const redirect = href => {
+    window.stop();
+    window.location.href = href
+  };
   const refresh = _ => redirect(window.location);
+  const refreshWithNoHistory = _ => {
+    window.stop();
+    window.location.replace(window.location);
+  };
 
   const err = (e, node) => {
     console.log(node);
@@ -47,10 +54,10 @@
       const rect = node.getBoundingClientRect();
       const clientX = rect.x + rect.width * x;
       const clientY = rect.y + rect.height * y;
-      return document.elementFromPoint(clientX, clientY) || node;
+      const target = document.elementFromPoint(clientX, clientY) || node;
+      return { target, clientX, clientY };
     } catch (e) {
       err(e, node);
-      return node;
     }
   };
 
@@ -58,7 +65,7 @@
     if (!node) return;
     console.log('simulateClick', node);
     try {
-      const target = getTopNode(document, node, 0.5, 0.5);
+      const { target, clientX, clientY } = getTopNode(document, node, 0.5, 0.5);
       console.log('simulateClick target', target, clientX, clientY);
       ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
         .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
@@ -101,6 +108,7 @@
       isUnwantedDuration,
       isUnwantedUrl,
       isVideoUrl,
+      refreshOnPageChange,
       processNode,
     } = args || {};
 
@@ -117,8 +125,8 @@
       console.error(e);
     }
 
-    let initializedVideo = false;
     let searchInputInitialized = false;
+    let initializedVideo = false;
     let loadedMetadata = false;
     let playbackInitiated = false;
     let playbackStarted = false;
@@ -171,30 +179,36 @@
           } catch (e) {
             err(e, video);
           }
+        } else {
+          console.log('fallback failure'); // FIXME: spankbang
         }
-      }, 100);
+      }, 200);
 
       setTimeout(_ => clearInterval(fallbackInterval), 20000);
     };
 
     let lastHref = window.location.href;
     let focusInterval;
+    let allowGeneralAutoplay = true;
     subscribeOnChanges(body, node => {
       const newHref = window.location.href;
       if (newHref !== lastHref) {
         console.log('new page', newHref);
         lastHref = newHref;
         initializedVideo = false;
-        searchInputInitialized = false;
         loadedMetadata = false;
         playbackInitiated = false;
         playbackStarted = false;
         if (focusInterval) {
           clearInterval(focusInterval);
+          if (refreshOnPageChange) {
+            refreshWithNoHistory();
+            return;
+          }
         }
       }
 
-      if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && !validLink(node)) {
+      if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
         node.classList.add(HIDE);
         return;
       }
@@ -239,7 +253,7 @@
         return;
       }
 
-      const url = new URL(window.location.href);
+      const url = window.location;
       const videoPage = url.pathname !== '/' && (!isVideoUrl || isVideoUrl(url.href));
 
       try {
@@ -266,12 +280,13 @@
       }
 
       try {
-        processNode?.(node);
+        allowGeneralAutoplay = processNode?.(node);
       } catch (e) {
         err(e, node);
       }
 
-      if (initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return;
+      if (!allowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return;
+      // TODO: if (!allowGeneralAutoplay || initializedVideo || !videoPage) return;
 
       const nonPreviewVideos = [...body.querySelectorAll('video')].filter(i => {
         const text = [...i.classList.values()].join(' ').toLowerCase();
@@ -279,7 +294,7 @@
       });
       const video = nonPreviewVideos
         .filter(i => i.offsetHeight > 0)
-        .sort((a, b) => b.offsetHeight - a.offsetHeight)[0] || nonPreviewVideos[0];
+        .sort((a, b) => b.offsetHeight - a.offsetHeight)[0] || nonPreviewVideos[0] || body.querySelector(videoSelector);
       if (!video) {
         console.log('no video');
         return;
@@ -388,6 +403,7 @@
         durationSelector: 'span[data-testid="unit-amount"]',
         isUnwantedDuration: text => !text?.includes('FULL '),
         isVideoUrl,
+        refreshOnPageChange: true,
         processNode: _node => {
           // TODO
         },
@@ -395,6 +411,7 @@
     },
 
     'pornhub.com': _ => {
+      // FIXME: opens video on thumbnail hover
       const DURATION_SELECTOR = 'var.duration, span.duration';
 
       const url = new URL(window.location.href);
@@ -436,7 +453,9 @@
         't': 'm',
       });
 
+      let allowGeneralAutoplay = true;
       const processEmbedded = document => {
+        allowGeneralAutoplay = false;
         const body = document.body;
         try {
           const css = 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important; }';
@@ -453,6 +472,7 @@
           console.error(e);
         }
 
+        // TODO: use general autoplay?
         try {
           const requiresRefresh = body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page');
           if (requiresRefresh) {
@@ -564,7 +584,7 @@
             err(e, node);
           }
 
-          if (!validLink(node) || node.closest('ul.filterListItem')) return;
+          if (!validLink(node) || node.closest('ul.filterListItem')) return allowGeneralAutoplay;
 
           const url = new URL(node.href.startsWith('https:') ? node.href : `${origin}${node.href}`);
           const params = url.searchParams;
@@ -576,18 +596,19 @@
             if (parts.length === 3) {
               url.pathname = [...parts, 'videos', 'upload'].join('/');
             } else if (!p.endsWith('/videos/upload')) {
-              return;
+              return allowGeneralAutoplay;
             }
             params.set('o', 'lg');
           } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
             if (parts.length === 3) {
               url.pathname = [...parts, 'videos'].join('/');
             } else if (!p.endsWith('/videos')) {
-              return;
+              return allowGeneralAutoplay;
             }
             params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
           }
           setTimeout(_ => node.href = url.toString(), 500);
+          return allowGeneralAutoplay;
         },
       });
 
@@ -609,7 +630,7 @@
           if (!params.has('t') || Number(params.get('t')) >= durationFromNormalPlayer) {
             window.stop();
             params.set('t', random(durationFromNormalPlayer / 4, durationFromNormalPlayer / 3));
-            window.location.replace(url.toString());
+            window.location.replace(url);
           }
         } else {
           console.log('fallback to embedded player');
@@ -716,6 +737,8 @@
       init({
         css: '.jw-hardlink-inner { display: none !important; }',
         searchInputSelector: 'div.search-input > input[type="text"][placeholder="Search by videos..."], input[type="text"][placeholder="Search by videos..."], input[type="text"]',
+        //playSelector: 'button.jw-icon[aria-label="Play"]', // FIXME
+        //videoSelector: 'video.jw-video', // FIXME
         thumbnailSelector: 'div.thumb',
         qualitySelector: 'div.labels',
         durationSelector: 'div.labels',
