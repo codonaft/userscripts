@@ -5,15 +5,13 @@
 // @match https://*.google.com/*
 // ==/UserScript==
 
-(_ => {
-  'use strict';
+'use strict';
 
-   const first = lang => lang.split('-')[0]
-   const lang = navigator.language || 'en';
-   const url = new URL(window.location.href);
-   if (!url.searchParams.has('hl') || first(url.searchParams.get('hl')) !== first(lang)) {
-     window.stop();
-     url.searchParams.set('hl', lang);
-     window.location.replace(url.toString());
-   }
-})();
+const first = lang => lang.split('-')[0]
+const lang = navigator.language || 'en';
+const url = new URL(window.location.href);
+if (!url.searchParams.has('hl') || first(url.searchParams.get('hl')) !== first(lang)) {
+  window.stop();
+  url.searchParams.set('hl', lang);
+  window.location.replace(url.toString());
+}

@@ -6,71 +6,69 @@
 // @match https://www.youtube.com/*
 // ==/UserScript==
 
-(_ => {
-  'use strict';
+'use strict';
 
-  if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
+if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
-  const randomPause = _ => {
-    const min = 3000;
-    const max = 5000;
-    return Math.floor(Math.random() * (max - min + 1) + min);
-  };
+const randomPause = _ => {
+  const min = 3000;
+  const max = 5000;
+  return Math.floor(Math.random() * (max - min + 1) + min);
+};
 
-  const process = (node, observer) => {
-    if (node.classList.contains('yt-spec-button-shape-next')) {
-      setTimeout(_ => {
-        if (node.getAttribute('aria-label')?.includes('No thanks')) {
-          node.click();
+const process = (node, observer) => {
+  if (node.classList.contains('yt-spec-button-shape-next')) {
+    setTimeout(_ => {
+      if (node.getAttribute('aria-label')?.includes('No thanks')) {
+        node.click();
+      }
+    }, randomPause());
+    observer.disconnect();
+    return false;
+  } else if (node.classList.contains('ytd-single-option-survey-renderer')) {
+    setTimeout(_ => {
+      if (node.getAttribute('icon')?.includes('yt-icons:close')) {
+        node.click();
+      }
+    }, randomPause());
+    return false;
+  } else if (node.tagName === 'DIV' && node.textContent.includes('My Ad Center')) {
+    setTimeout(_ => {
+      node.querySelectorAll('button').forEach(i => {
+        if (i.getAttribute('aria-label')?.includes('Close')) {
+          i.click();
         }
-      }, randomPause());
-      observer.disconnect();
-      return false;
-    } else if (node.classList.contains('ytd-single-option-survey-renderer')) {
-      setTimeout(_ => {
-        if (node.getAttribute('icon')?.includes('yt-icons:close')) {
-          node.click();
-        }
-      }, randomPause());
-      return false;
-    } else if (node.tagName === 'DIV' && node.textContent.includes('My Ad Center')) {
-      setTimeout(_ => {
-        node.querySelectorAll('button').forEach(i => {
-          if (i.getAttribute('aria-label')?.includes('Close')) {
-            i.click();
-          }
-        });
-      }, randomPause());
-      observer.disconnect();
-      return false;
+      });
+    }, randomPause());
+    observer.disconnect();
+    return false;
+  }
+
+  return true;
+};
+
+const subscribeOnChanges = (node, selector, f) => {
+  const apply = (node, observer) => {
+    if (node?.nodeType !== 1) return;
+
+    let observeChildren = true;
+    if (node?.matches?.(selector)) {
+      try {
+        observeChildren = f(node, observer);
+      } catch (e) {
+        err(e, node);
+      }
     }
 
-    return true;
+    if (observeChildren) {
+      const children = node?.childNodes || [];
+      children.forEach(i => apply(i, observer));
+    }
   };
 
-  const subscribeOnChanges = (node, selector, f) => {
-    const apply = (node, observer) => {
-      if (node?.nodeType !== 1) return;
+  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
+  observer.observe(node, { childList: true, subtree: true });
+  apply(node, observer);
+};
 
-      let observeChildren = true;
-      if (node?.matches?.(selector)) {
-        try {
-          observeChildren = f(node, observer);
-        } catch (e) {
-          err(e, node);
-        }
-      }
-
-      if (observeChildren) {
-        const children = node?.childNodes || [];
-        children.forEach(i => apply(i, observer));
-      }
-    };
-
-    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-    observer.observe(node, { childList: true, subtree: true });
-    apply(node, observer);
-  };
-
-  subscribeOnChanges(document.body, 'button, div, span', process);
-})();
+subscribeOnChanges(document.body, 'button, div, span', process);
