@@ -696,7 +696,6 @@
         }, 1000);
       } else if (isVideoUrl(p)) {
         const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
-        const normalPlayer = body.querySelector(videoSelector);
         if (durationFromNormalPlayer) {
           const lowQuality = ![...body.querySelectorAll('ul.mgp_quality > li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
           console.log('low quality', lowQuality);
