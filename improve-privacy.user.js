@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.8
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -8,24 +8,34 @@
   'use strict';
 
   const cleanup = node => {
-    if (node.tagName !== 'A') return;
-
-    const href = node.href;
-    const youtube = href.startsWith('https://www.youtube.com/watch?') || href.startsWith('https://youtu.be/');
-    const other = href.startsWith('https://maps.app.goo.gl/');
-    if (!youtube && !other) return;
-
-    const url = new URL(href);
-    [...url.searchParams.keys()]
-      .filter(k => other || !['index', 'list', 't', 'v'].includes(k))
-      .forEach(k => url.searchParams.delete(k));
-
-    const newHref = url.toString();
-    if (newHref !== href) {
-      node.href = newHref;
-      if (node.textContent.trim() === href) {
-        node.innerHTML = newHref;
+    try {
+      if (node.data?.clickTrackingParams?.length > 0) {
+        node.data.clickTrackingParams = '';
       }
+
+      if (!node.matches('[href]')) return;
+      const href = node.href;
+      if (!href) return;
+
+      const youtube = href.startsWith('https://www.youtube.com/watch?') || href.startsWith('https://youtu.be/');
+      const other = href.startsWith('https://maps.app.goo.gl/');
+      if (!youtube && !other) return;
+
+      const url = new URL(href);
+      [...url.searchParams.keys()]
+        .filter(k => other || !['index', 'list', 't', 'v'].includes(k))
+        .forEach(k => url.searchParams.delete(k));
+
+      const newHref = url.toString();
+      if (newHref !== href) {
+        node.href = newHref;
+        if (node.textContent.trim() === href) {
+          node.innerHTML = newHref;
+        }
+      }
+    } catch (e) {
+      console.log(node);
+      console.error(e);
     }
   };
 
