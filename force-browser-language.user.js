@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force Browser Language
 // @version 0.6
-// @downloadURL https://userscripts.codonaft.com/force-browser-language.js
+// @downloadURL https://userscripts.codonaft.com/force-browser-language.user.js
 // @match https://*.google.com/*
 // ==/UserScript==
 

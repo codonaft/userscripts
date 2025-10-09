@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Remove Pseudocensorship
 // @version 0.4
-// @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.js
+// @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.user.js
 // ==/UserScript==
 
 (_ => {
