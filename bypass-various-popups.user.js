@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.10
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -23,9 +23,7 @@
   const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 
   const process = (node, observer) => {
-    if (node.nodeType !== 1) return;
-
-    if (node.matches?.('div[role=dialog]')) {
+    if (node.matches('div[role=dialog]')) {
       setTimeout(_ => {
         node.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
         node.querySelectorAll('button.btn').forEach(i => {
@@ -40,58 +38,58 @@
         });
       }, randomPause(1000, 1500));
       observer.disconnect();
-      return;
+      return false;
     }
 
-    if (node.matches?.('div.age-popup-btns > #okButton') && node.textContent.includes('18 or older')) {
+    if (node.matches('div.age-popup-btns > #okButton') && node.textContent.includes('18 or older')) {
       observer.disconnect();
       node.click();
-      return;
+      return false;
     }
 
     if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent.includes('Continue without disabling')) {
       observer.disconnect();
       node.parentElement.click();
-      return;
+      return false;
     }
 
-    if (node.matches?.('div#credential_picker_container')) {
+    if (node.matches('div#credential_picker_container')) {
       node.style.display = 'none';
-      return;
+      return false;
     }
 
     if (node.tagName === 'BUTTON' && (node.getAttribute('data-role') === 'parental-control-confirm-button' || node.textContent.includes('Stay logged out'))) {
       setTimeout(_ => node.click(), randomPause(1000, 1500));
-      return;
+      return false;
     }
 
-    if (node.matches?.('div#cookie-banner')) {
+    if (node.matches('div#cookie-banner')) {
       observer.disconnect();
       node.querySelector('a#accept-essential')?.click();
-      return;
+      return false;
     }
 
-    if (node.matches?.('button[role="button"] > span') && node.textContent === 'Continue') {
+    if (node.matches('button[role="button"] > span') && node.textContent === 'Continue') {
       node.closest('button')?.click();
-      return;
+      return false;
     }
 
-    if (node.matches?.('#cookieconsentwarningcontainer, #donate_banner')) {
+    if (node.matches('#cookieconsentwarningcontainer, #donate_banner')) {
       observer.disconnect();
       node.parentNode?.removeChild(node);
-      return;
+      return false;
     }
 
-    if (node.matches?.('#modalWrapMTubes')) {
+    if (node.matches('#modalWrapMTubes')) {
       observer.disconnect();
       setTimeout(
         _ => node.querySelectorAll('div > div > button').forEach(i => i.click()),
         randomPause(100, 400)
       );
-      return;
+      return false;
     }
 
-    if (node.matches?.('div.disclaimer_message')) {
+    if (node.matches('div.disclaimer_message')) {
       observer.disconnect();
       node.querySelectorAll('span').forEach(i => {
         if (i.textContent.includes('I am 18 years')) {
@@ -99,17 +97,40 @@
         }
       });
       node.querySelectorAll('button.current-main-cat').forEach(i => i.click());
-      return;
+      return false;
     }
 
-    node.childNodes.forEach(n => process(n, observer));
+    return true;
   };
 
-  const subscribeOnChanges = (node, f) => {
-    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => f(n, observer))));
+  const subscribeOnChanges = (node, selector, f) => {
+    const apply = (node, observer) => {
+      if (node?.nodeType !== 1) return;
+
+      let observeChildren = true;
+      if (node?.matches?.(selector)) {
+        try {
+          observeChildren = f(node, observer);
+        } catch (e) {
+          err(e, node);
+        }
+      }
+
+      if (observeChildren) {
+        const children = node?.childNodes || [];
+        children.forEach(i => apply(i, observer));
+      }
+    };
+
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
     observer.observe(node, { childList: true, subtree: true });
-    f(node, observer);
+    apply(node, observer);
   };
 
-  subscribeOnChanges(document.body, process);
+  const err = (e, node) => {
+    console.log(node);
+    console.error(e);
+  };
+
+  subscribeOnChanges(document.body, 'button, div, span', process);
 })();

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -12,9 +12,31 @@
 
   if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
-  const process = (node, observer) => {
-    if (node.nodeType !== 1 || node.tagName !== 'BUTTON' || !node.classList.contains('ytp-play-button') || node.getAttribute('data-title-no-tooltip') === 'Play') return;
+  const subscribeOnChanges = (node, selector, f) => {
+    const apply = (node, observer) => {
+      if (node?.nodeType !== 1) return;
 
+      let observeChildren = true;
+      if (node?.matches?.(selector)) {
+        try {
+          observeChildren = f(node, observer);
+        } catch (e) {
+          err(e, node);
+        }
+      }
+
+      if (observeChildren) {
+        const children = node?.childNodes || [];
+        children.forEach(i => apply(i, observer));
+      }
+    };
+
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
+    observer.observe(node, { childList: true, subtree: true });
+    apply(node, observer);
+  };
+
+  subscribeOnChanges(document.body, 'button.ytp-play-button[data-title-no-tooltip="Pause"]', (node, observer) => {
     observer.disconnect();
     node.click();
 
@@ -33,13 +55,12 @@
 
       div?.parentNode.replaceChild(link, div);
     }
-  };
 
-  const subscribeOnChanges = (node, f) => {
-    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => f(n, observer))));
-    observer.observe(node, { childList: true, subtree: true });
-    f(node, observer);
-  };
+    return false;
+  });
 
-  subscribeOnChanges(document.body, process);
+  const err = (e, node) => {
+    console.log(node);
+    console.error(e);
+  };
 })();

@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.25
+// @version 0.26
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -74,23 +74,28 @@
     }
   };
 
-  const subscribeOnChanges = (node, f) => {
-    const g = node => {
-      const children = node?.querySelectorAll?.('a, div, input, li, span, var, video') || [];
-      [node, ...children].forEach(i => {
-        if (i?.nodeType !== 1) return;
+  const subscribeOnChanges = (node, selector, f) => {
+    const apply = (node, observer) => {
+      if (node?.nodeType !== 1) return;
+
+      let observeChildren = true;
+      if (node?.matches?.(selector)) {
         try {
-          f(i);
+          observeChildren = f(node, observer);
         } catch (e) {
           err(e, node);
         }
-      });
+      }
+
+      if (observeChildren) {
+        const children = node?.childNodes || [];
+        children.forEach(i => apply(i, observer));
+      }
     };
 
-    g(node);
-
-    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(g)))
-      .observe(node, { childList: true, subtree: true });
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
+    observer.observe(node, { childList: true, subtree: true });
+    apply(node, observer);
   };
 
   const init = args => {
@@ -194,7 +199,7 @@
               video.currentTime = time;
             }
             playIfPaused(video);
-            video.muted = false;
+            //video.muted = false; // TODO
             playbackInitiated = true;
           }, { once: true });
 
@@ -208,7 +213,7 @@
     let lastHref = window.location.href;
     //let focusInterval;
     let disallowGeneralAutoplay = false;
-    subscribeOnChanges(body, node => {
+    subscribeOnChanges(body, 'a, div, input, li, span, var, video', (node, _observer) => {
       const newHref = window.location.href;
       if (newHref !== lastHref) {
         console.log('new page', newHref);
@@ -221,14 +226,14 @@
         //  clearInterval(focusInterval);
           if (refreshOnPageChange) {
             refreshWithNoHistory();
-            return;
+            return true;
           }
         //}
       }
 
       if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
         node.classList.add(HIDE);
-        return;
+        return true;
       }
 
       if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
@@ -237,7 +242,7 @@
         const searchInput = node.matches(searchInputSelector) ? node : body.querySelector(searchInputSelector);
         if (!searchInput) {
           console.error('search input not found');
-          return;
+          return true;
         }
 
         document.addEventListener('keydown', event => {
@@ -268,7 +273,7 @@
         } else {
           searchForm?.addEventListener('submit', handleSearch, true);
         }
-        return;
+        return true;
       }
 
       const url = window.location;
@@ -278,7 +283,7 @@
         if (AUTOPLAY && !playbackInitiated && videoPage && playSelector && !videoSelector && node.matches(playSelector) && !body.querySelector('video')) {
           console.log('detected play button while there is no video node yet', node);
           setTimeout(_ => node.click(), 1);
-          return;
+          return true;
         }
 
         const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(new URL(node.href)));
@@ -291,7 +296,7 @@
           } else {
             thumbnail?.classList.add(UNWANTED);
           }
-          return;
+          return true;
         }
       } catch (e) {
         err(e, node);
@@ -303,7 +308,7 @@
         err(e, node);
       }
 
-      if (disallowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return;
+      if (disallowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return true;
 
       const nonPreviewVideos = [...body.querySelectorAll('video')].filter(i => {
         const text = [...i.classList.values()].join(' ').toLowerCase();
@@ -316,7 +321,7 @@
       );
       if (!video) {
         console.log('no video');
-        return;
+        return true;
       }
 
       console.log('detected main video', video);
@@ -372,6 +377,8 @@
       initializedVideo = true;
       console.log('load');
       video.load();
+
+      return true;
     });
   };
 
@@ -931,6 +938,11 @@
         isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
         isUnwantedDuration: text => !text.includes('h') && Number(text.split(' min')[0] || 0) < MIN_DURATION_MINS,
         processNode: node => {
+          if (node.matches('div.error-dialog div.error-content button') && node.textContent.includes('Retry')) {
+            node.click();
+            return;
+          }
+
           if (!validLink(node) || node.closest('div.search-filters')) return;
 
           const url = new URL(node.href);

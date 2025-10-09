@@ -18,8 +18,6 @@
   };
 
   const process = (node, observer) => {
-    if (node.nodeType !== 1) return;
-
     if (node.classList.contains('yt-spec-button-shape-next')) {
       setTimeout(_ => {
         if (node.getAttribute('aria-label')?.includes('No thanks')) {
@@ -27,14 +25,14 @@
         }
       }, randomPause());
       observer.disconnect();
-      return;
+      return false;
     } else if (node.classList.contains('ytd-single-option-survey-renderer')) {
       setTimeout(_ => {
         if (node.getAttribute('icon')?.includes('yt-icons:close')) {
           node.click();
         }
       }, randomPause());
-      return;
+      return false;
     } else if (node.tagName === 'DIV' && node.textContent.includes('My Ad Center')) {
       setTimeout(_ => {
         node.querySelectorAll('button').forEach(i => {
@@ -44,17 +42,35 @@
         });
       }, randomPause());
       observer.disconnect();
-      return;
+      return false;
     }
 
-    node.childNodes.forEach(n => process(n, observer));
+    return true;
   };
 
-  const subscribeOnChanges = (node, f) => {
-    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(n => f(n, observer))));
+  const subscribeOnChanges = (node, selector, f) => {
+    const apply = (node, observer) => {
+      if (node?.nodeType !== 1) return;
+
+      let observeChildren = true;
+      if (node?.matches?.(selector)) {
+        try {
+          observeChildren = f(node, observer);
+        } catch (e) {
+          err(e, node);
+        }
+      }
+
+      if (observeChildren) {
+        const children = node?.childNodes || [];
+        children.forEach(i => apply(i, observer));
+      }
+    };
+
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
     observer.observe(node, { childList: true, subtree: true });
-    f(node, observer);
+    apply(node, observer);
   };
 
-  subscribeOnChanges(document.body, process);
+  subscribeOnChanges(document.body, 'button, div, span', process);
 })();

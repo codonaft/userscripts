@@ -1,11 +1,14 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.10
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
 (_ => {
   'use strict';
+
+  const hiddenNodes = 'div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.style-scope.ytd-topbar-logo-renderer';
+  const links = '[href]';
 
   const cleanup = node => {
     try {
@@ -17,17 +20,17 @@
     }
 
     try {
-      if (!node.matches('[href]')) return;
+      if (!node.matches(links)) return true;
       const href = node.href;
-      if (!href) return;
+      if (!href) return true;
 
       const youtube = href.startsWith('https://www.youtube.com/watch?') || href.startsWith('https://youtu.be/');
-      const other = href.startsWith('https://maps.app.goo.gl/');
-      if (!youtube && !other) return;
+      const maps = href.startsWith('https://maps.app.goo.gl/');
+      if (!youtube && !maps) return true;
 
       const url = new URL(href);
       [...url.searchParams.keys()]
-        .filter(k => other || !['index', 'list', 't', 'v'].includes(k))
+        .filter(k => maps || !['index', 'list', 't', 'v'].includes(k))
         .forEach(k => url.searchParams.delete(k));
 
       const newHref = url.toString();
@@ -40,23 +43,31 @@
     } catch (e) {
       err(e, node);
     }
+    return true;
   };
 
-  const process = node => {
-    if (node?.nodeType !== 1) return;
+  const subscribeOnChanges = (node, selector, f) => {
+    const apply = (node, observer) => {
+      if (node?.nodeType !== 1) return;
 
-    try {
-      const h = window.location.hostname;
-      if (['youtube.com', 'youtu.be', 'google.com'].find(i => h.endsWith(i)) && node.matches?.('span.style-scope.ytd-topbar-logo-renderer, div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als')) {
-        node.style.display = 'none';
-        return;
+      let observeChildren = true;
+      if (node?.matches?.(selector)) {
+        try {
+          observeChildren = f(node, observer);
+        } catch (e) {
+          err(e, node);
+        }
       }
-    } catch (e) {
-      err(e, node);
-    }
 
-    cleanup(node);
-    node.childNodes.forEach(process);
+      if (observeChildren) {
+        const children = node?.childNodes || [];
+        children.forEach(i => apply(i, observer));
+      }
+    };
+
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
+    observer.observe(node, { childList: true, subtree: true });
+    apply(node, observer);
   };
 
   const err = (e, node) => {
@@ -64,11 +75,17 @@
     console.error(e);
   };
 
-  const subscribeOnChanges = (node, f) => {
-    f(node);
-    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(f)))
-      .observe(node, { childList: true, subtree: true });
-  };
+  subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {
+    try {
+      const h = window.location.hostname;
+      if (['youtube.com', 'youtu.be', 'google.com'].find(i => h.endsWith(i)) && node.matches(hiddenNodes)) {
+        node.style.display = 'none';
+        return false;
+      }
+    } catch (e) {
+      err(e, node);
+    }
 
-  subscribeOnChanges(document.body, process);
+    return cleanup(node);
+  });
 })();

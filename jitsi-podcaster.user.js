@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.7
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.user.js
 // ==/UserScript==
 
@@ -15,31 +15,53 @@
   const b = document.body;
   if (!b) return;
 
+  const hiddenNodes = 'div.details-container, div.bottom-indicators, a.watermark.leftwatermark[href="https://jitsi.org"]';
+  const someHiddenNodes = 'span.videocontainer.display-video';
+
   const hide = node => node.style.display = 'none';
 
-  const process = node => {
-    if (node.nodeType !== 1) return;
+  const subscribeOnChanges = (node, selector, f) => {
+    const apply = (node, observer) => {
+      if (node?.nodeType !== 1) return;
 
-    if (node.matches?.('div.details-container, div.bottom-indicators, a.watermark.leftwatermark[href="https://jitsi.org"]')) {
+      let observeChildren = true;
+      if (node?.matches?.(selector)) {
+        try {
+          observeChildren = f(node, observer);
+        } catch (e) {
+          err(e, node);
+        }
+      }
+
+      if (observeChildren) {
+        const children = node?.childNodes || [];
+        children.forEach(i => apply(i, observer));
+      }
+    };
+
+    const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
+    observer.observe(node, { childList: true, subtree: true });
+    apply(node, observer);
+  };
+
+  const err = (e, node) => {
+    console.log(node);
+    console.error(e);
+  };
+
+  subscribeOnChanges(document.body, `${hiddenNodes}, ${someHiddenNodes}`, (node, _observer) => {
+    if (node.matches(hiddenNodes)) {
       hide(node);
-      return;
+      return false;
     }
 
-    if (node.matches?.('span.videocontainer.display-video')) {
+    if (node.matches(someHiddenNodes)) {
       if (node.children.length >= 5) {
         [3, 4].forEach(i => hide(node.children[i]));
       }
-      return;
+      return false;
     }
 
-    node.childNodes.forEach(process);
-  };
-
-  const subscribeOnChanges = (node, f) => {
-    f(node);
-    new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(f)))
-      .observe(node, { childList: true, subtree: true });
-  };
-
-  subscribeOnChanges(b, process);
+    return true;
+  });
 })();
