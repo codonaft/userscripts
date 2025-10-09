@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.7
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -17,7 +17,7 @@
 
     const url = new URL(href);
     [...url.searchParams.keys()]
-      .filter(k => other || !['index', 'list', 'v'].includes(k))
+      .filter(k => other || !['index', 'list', 't', 'v'].includes(k))
       .forEach(k => url.searchParams.delete(k));
 
     const newHref = url.toString();
