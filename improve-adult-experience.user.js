@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.29
+// @version 0.30
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -123,9 +123,9 @@ const init = args => {
   try {
     const style = document.createElement('style');
     style.innerHTML = `
-      .${HIDE} { display: none !important; }
-      .${UNWANTED} { opacity: 10% !important; }
-      .${UNWANTED}:hover { opacity: 40% !important; }
+      .${HIDE} { display: none !important }
+      .${UNWANTED} { opacity: 10% !important }
+      .${UNWANTED}:hover { opacity: 40% !important }
       ${MINOR_IMPROVEMENTS && css ? css : ''}
     `;
     body.appendChild(style);
@@ -541,7 +541,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       disallowGeneralAutoplay = true;
       const body = document.body;
       try {
-        const css = 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important; }';
+        const css = 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important }';
         const styleApplied = !![...body.querySelectorAll('style')].find(i => i.innerHTML === css);
         if (styleApplied) {
           console.log('embedded video is already initialized');
@@ -646,7 +646,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     };
 
     init({
-      css: '#searchSuggestions a:focus { background-color: #111111 !important; }',
+      css: '#searchSuggestions a:focus { background-color: #111111 !important }',
       searchInputSelector: 'input#searchInput[type="text"], input[type="text"][name="search"], input[type="text"]', // TODO: multiple selectors for priority?
       onSearch: (query, form) => {
         const url = new URL(form.action);
@@ -739,7 +739,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     const ending = `${topRated}/${minDuration}/`;
 
     init({
-      // TODO: css: 'div.sort-holder { display: none !important; }',
+      // TODO: css: 'div.sort-holder { display: none !important }',
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
       searchFormOrSubmitButtonSelector: 'form#search_form > button[type="submit"][aria-label="search"], button[type="submit"]',
       onSearch: (query, _form) => redirect(`${origin}/search/${query}/${ending}`),
@@ -773,7 +773,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
 
   'spankbang.com': _ => {
     init({
-      css: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper { display: none !important; }',
+      css: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper { display: none !important }',
       searchInputSelector: 'input#search-input[type="text"], input[type="text"]',
       /*onSearch: (query, form) => { // TODO
         const url = new URL(`${origin}/s/${query}/`);
@@ -809,7 +809,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     const hd = 'HD';
     const isVideoUrl = href => href.includes('/videos/');
     init({
-      css: '.jw-hardlink-inner { display: none !important; }',
+      css: '.jw-hardlink-inner { display: none !important }',
       searchInputSelector: 'div.search-input > input[type="text"][placeholder="Search by videos..."], input[type="text"][placeholder="Search by videos..."], input[type="text"]',
       thumbnailSelector: 'div.thumb',
       qualitySelector: 'div.labels',
@@ -850,7 +850,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   'vxxx.com': _ => {
     const minDurationMins = 8; // NOTE: content is a disaster here
     init({
-      css: '.jw-hardlink-inner { display: none !important; }',
+      css: '.jw-hardlink-inner { display: none !important }',
       searchInputSelector: 'input[type="text"][placeholder="Search..."], input[type="text"]',
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
@@ -861,7 +861,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   'xhamster.com': _ => {
     const best = 'hd/full-length/best';
     init({
-      css: 'div[data-block="moments"] { display: none !important; }',
+      css: 'div[data-block="moments"] { display: none !important }',
       searchInputSelector: 'input[name="q"][type="text"], input[type="text"]',
       searchFormOrSubmitButtonSelector: 'form.search-submit-container > button.search-submit[type="submit"], button[type="submit"]',
       onSearch: (query, _form) => {
@@ -897,7 +897,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   'xnxx.com': _ => {
     const searchPath = '/search/hits/20min+/fullhd';
     init({
-      css: '.gold-plate, .premium-results-line { display: none !important; }',
+      css: '.gold-plate, .premium-results-line { display: none !important }',
       searchInputSelector: 'input[type="text"][name="k"][placeholder="Search..."], input[type="text"]',
       onSearch: (query, _form) => redirect(`${searchPath}/${query}`),
       // TODO: thumbnailSelector: 'div.thumb',
@@ -927,7 +927,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
 
   'xvideos.com': _ => {
     init({
-      css: 'a.premium { display: none !important; }',
+      css: 'a.premium { display: none !important }',
       searchInputSelector: 'input.search-input[type="text"], input[placeholder="Search X videos"], input[type="text"]',
       onSearch: (query, form) => {
         const url = new URL(form.action);

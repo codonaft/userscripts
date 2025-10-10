@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.7
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -13,10 +13,13 @@ const b = document.body;
 if (!b) return;
 if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 
+const categories = ['general'];
+
 const disabledEngines = {
   'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini'],
   'it': ['codeberg'],
 };
+const disabledEnginesFlat = Object.values(disabledEngines).flat();
 
 const enabledEngines = {
   'files': ['piratebay', 'solidtorrents', 'z-library'],
@@ -36,21 +39,28 @@ const enabledPlugins = ['calculator', 'oa_doi_rewrite', 'tracker_url_remover', '
 // https://docs.searxng.org/dev/search_api.html
 const params = {
   'autocomplete': '',
-  'categories': ['general', 'it'].join(','),
-  'disabled_engines': Object.values(disabledEngines).flat().join(','),
-  'enabled_engines': Object.values(enabledEngines).flat().filter(i => !Object.values(disabledEngines).flat().includes(i)).join(','),
+  'categories': categories.join(','),
+  'disabled_engines': disabledEnginesFlat.join(','),
+  'enabled_engines': Object.values(enabledEngines).flat().filter(i => !disabledEnginesFlat.includes(i)).join(','),
   'enabled_plugins': enabledPlugins.join(','),
   'image_proxy': 'True',
   'safesearch': 0,
 };
 
+const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+const pickRandom = xs => xs[random(0, xs.length)];
+const enginesCookie = (engines, excluded) => Object
+  .entries(engines)
+  .flatMap(([category, v]) => v.filter(i => !excluded.includes(i))
+  .map(engine => `${engine}__${category}`)).join(',');
+
 const cookies = {
   'advanced_search': 1,
   'autocomplete': params.autocomplete || '',
-  'categories': params.categories || 'general',
-  'disabled_engines': 'bing__general',
-  'doi_resolver': 'sci-hub.se',
-  'enabled_engines': Object.entries(enabledEngines).flatMap(([category, v]) => v.map(engine => `${engine}__${category}`)).join(','),
+  'categories': params.categories,
+  'disabled_engines': enginesCookie(disabledEngines, []),
+  'doi_resolver': pickRandom(['sci-hub.se', 'sci-hub.st', 'sci-hub.ru']),
+  'enabled_engines': enginesCookie(enabledEngines, disabledEnginesFlat),
   'enabled_plugins': enabledPlugins.join(','),
   'favicon_resolver': '',
   'hotkeys': 'vim',
