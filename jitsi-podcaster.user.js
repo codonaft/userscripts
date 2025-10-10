@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.8
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.user.js
 // ==/UserScript==
 
 // TODO: remove frame and mic animation dots
 
+(_ => {
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -63,3 +64,4 @@ subscribeOnChanges(document.body, `${hiddenNodes}, ${someHiddenNodes}`, (node, _
 
   return true;
 });
+})();

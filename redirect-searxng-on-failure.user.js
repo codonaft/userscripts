@@ -2,10 +2,11 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -57,3 +58,4 @@ if (postRequest) {
 const params = url.searchParams.toString();
 url.search = '';
 window.location.replace(`${url.toString()}#${params}`);
+})();

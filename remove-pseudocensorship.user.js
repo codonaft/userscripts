@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name Remove Pseudocensorship
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.user.js
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 const subscribeOnChanges = (node, selector, f) => {
@@ -41,3 +42,4 @@ subscribeOnChanges(document.body, 'p', (node, _observer) => {
   }
   return true;
 });
+})();

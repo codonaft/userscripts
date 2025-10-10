@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name Force Browser Language
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/force-browser-language.user.js
 // @match https://*.google.com/*
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 const first = lang => lang.split('-')[0]
@@ -15,3 +16,4 @@ if (!url.searchParams.has('hl') || first(url.searchParams.get('hl')) !== first(l
   url.searchParams.set('hl', lang);
   window.location.replace(url.toString());
 }
+})();

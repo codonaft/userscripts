@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
 // @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.user.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -72,3 +73,4 @@ const subscribeOnChanges = (node, selector, f) => {
 };
 
 subscribeOnChanges(document.body, 'button, div, span', process);
+})();

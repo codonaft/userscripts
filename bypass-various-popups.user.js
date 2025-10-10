@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.11
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -15,6 +15,7 @@
 // @match https://xhamster.com/*
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -132,3 +133,4 @@ const err = (e, node) => {
 };
 
 subscribeOnChanges(document.body, 'button, div, span', process);
+})();

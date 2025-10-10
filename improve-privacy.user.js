@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.11
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 const hiddenNodes = 'div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.style-scope.ytd-topbar-logo-renderer';
@@ -87,3 +88,4 @@ subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) 
 
   return cleanup(node);
 });
+})();

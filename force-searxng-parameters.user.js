@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
+(_ => {
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
@@ -36,8 +37,8 @@ const enabledPlugins = ['calculator', 'oa_doi_rewrite', 'tracker_url_remover', '
 const params = {
   'autocomplete': '',
   'categories': ['general', 'it'].join(','),
-  'disabled_engines': Object.values(disabledEngines).flatMap(i => i).join(','),
-  'enabled_engines': Object.values(enabledEngines).flatMap(i => i).filter(i => !Object.values(disabledEngines).flatMap(i => i).includes(i)).join(','),
+  'disabled_engines': Object.values(disabledEngines).flat().join(','),
+  'enabled_engines': Object.values(enabledEngines).flat().filter(i => !Object.values(disabledEngines).flat().includes(i)).join(','),
   'enabled_plugins': enabledPlugins.join(','),
   'image_proxy': 'True',
   'safesearch': 0,
@@ -76,7 +77,12 @@ if (form) {
 Object.entries(cookies).forEach(([k, v]) => document.cookie = `${k}=${v}`);
 
 if (!params.autocomplete) {
-  const style = document.createElement('style');
-  style.innerHTML = 'div.autocomplete { display: none !important }';
-  b.appendChild(style);
+  try {
+    const style = document.createElement('style');
+    style.innerHTML = 'div.autocomplete { display: none !important }';
+    b.appendChild(style);
+  } catch (e) {
+    console.error(e);
+  }
 }
+})();
