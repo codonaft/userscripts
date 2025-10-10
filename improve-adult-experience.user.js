@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.27
+// @version 0.28
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -20,10 +20,12 @@ const MIN_VIDEO_HEIGHT = 1080;
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
+const body = document.body;
+if (document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') || [...body.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
+
 const UNWANTED = '__unwanted';
 const HIDE = '__hide';
 
-const body = document.body;
 const origin = window.location.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
 const redirect = href => {
