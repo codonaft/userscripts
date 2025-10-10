@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.26
+// @version 0.27
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -232,7 +232,7 @@ const init = args => {
 
     if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
       node.classList.add(HIDE);
-      return true;
+      return false;
     }
 
     if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
@@ -909,8 +909,12 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         const url = new URL(node.href);
         const p = url.pathname;
         if (p.startsWith('/search/')) {
-          const query = p.split('/').slice(-1);
-          url.pathname = `${searchPath}/${query}`;
+          const parts = p.split('/');
+          const lastPart = parts.slice(-1)[0] || '';
+          const hasPage = parts.length > 5 && !!Number(lastPart);
+          const page = hasPage ? lastPart : '';
+          const query = parts.slice(hasPage ? -2 : -1)[0] || '';
+          url.pathname = `${searchPath}/${query}/${page}`;
           url.search = '';
           node.href = url.toString();
         }
