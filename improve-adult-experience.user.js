@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
-// @icon https://www.google.com/s2/favicons?sz=64&domain=pornhub.com
-// @version 0.30
+// @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
+// @version 0.31
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 

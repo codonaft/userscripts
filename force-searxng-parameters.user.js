@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
-// @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.8
+// @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -13,15 +13,10 @@ const b = document.body;
 if (!b) return;
 if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 
-const categories = ['general'];
+const CATEGORIES = ['general'];
 
-const disabledEngines = {
-  'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini'],
-  'it': ['codeberg'],
-};
-const disabledEnginesFlat = Object.values(disabledEngines).flat();
-
-const enabledEngines = {
+// NOTE: overwritten by DISABLED_ENGINES
+const ENABLED_ENGINES = {
   'files': ['piratebay', 'solidtorrents', 'z-library'],
   'general': ['duckduckgo', 'google', 'mozhi', 'openlibrary', 'wikipedia', 'wolframalpha'],
   'images': ['brave.images', 'duckduckgo images', 'google images', 'mojeek images', 'presearch images', 'qwant images', 'startpage images'],
@@ -34,15 +29,22 @@ const enabledEngines = {
   'onions': ['ahmia', 'torch'],
 };
 
-const enabledPlugins = ['calculator', 'oa_doi_rewrite', 'tracker_url_remover', 'Vim-like_hotkeys'];
+const DISALBED_ENGINES = {
+  'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini'],
+  'it': ['codeberg'],
+};
+
+const ENABLED_PLUGINS = ['calculator', 'oa_doi_rewrite', 'tracker_url_remover', 'Vim-like_hotkeys'];
+
+const disabledEnginesFlat = Object.values(DISALBED_ENGINES).flat();
 
 // https://docs.searxng.org/dev/search_api.html
 const params = {
   'autocomplete': '',
-  'categories': categories.join(','),
+  'categories': CATEGORIES.join(','),
   'disabled_engines': disabledEnginesFlat.join(','),
-  'enabled_engines': Object.values(enabledEngines).flat().filter(i => !disabledEnginesFlat.includes(i)).join(','),
-  'enabled_plugins': enabledPlugins.join(','),
+  'enabled_engines': Object.values(ENABLED_ENGINES).flat().filter(i => !disabledEnginesFlat.includes(i)).join(','),
+  'enabled_plugins': ENABLED_PLUGINS.join(','),
   'image_proxy': 'True',
   'safesearch': 0,
 };
@@ -57,11 +59,11 @@ const enginesCookie = (engines, excluded) => Object
 const cookies = {
   'advanced_search': 1,
   'autocomplete': params.autocomplete || '',
-  'categories': params.categories,
-  'disabled_engines': enginesCookie(disabledEngines, []),
+  'categories': params.categories || '',
+  'disabled_engines': enginesCookie(DISALBED_ENGINES, []),
   'doi_resolver': pickRandom(['sci-hub.se', 'sci-hub.st', 'sci-hub.ru']),
-  'enabled_engines': enginesCookie(enabledEngines, disabledEnginesFlat),
-  'enabled_plugins': enabledPlugins.join(','),
+  'enabled_engines': enginesCookie(ENABLED_ENGINES, disabledEnginesFlat),
+  'enabled_plugins': ENABLED_PLUGINS.join(','),
   'favicon_resolver': '',
   'hotkeys': 'vim',
   'image_proxy': +(params.image_proxy === 'True'),
@@ -75,13 +77,17 @@ const cookies = {
 
 const form = b.querySelector('form#search');
 if (form) {
-  Object.entries(params).forEach(([k, v]) => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = k;
-    input.value = v;
-    form.appendChild(input);
-  });
+  try {
+    Object.entries(params).forEach(([k, v]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = k;
+      input.value = v;
+      form.appendChild(input);
+    });
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 Object.entries(cookies).forEach(([k, v]) => document.cookie = `${k}=${v}`);

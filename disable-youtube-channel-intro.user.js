@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
-// @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.7
+// @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*

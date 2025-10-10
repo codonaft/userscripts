@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
-// @icon https://www.google.com/s2/favicons?sz=64&domain=jitsi.org
-// @version 0.9
+// @icon https://external-content.duckduckgo.com/ip3/jitsi.org.ico
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.user.js
 // ==/UserScript==
 

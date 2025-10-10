@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
-// @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.7
+// @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // ==/UserScript==
 

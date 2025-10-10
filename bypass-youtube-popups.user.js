@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
-// @icon https://www.google.com/s2/favicons?sz=64&domain=youtube.com
-// @version 0.3
+// @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.user.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
