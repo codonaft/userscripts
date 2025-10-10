@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://www.google.com/s2/favicons?sz=64&domain=searx.space
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -14,6 +14,7 @@ if (!document.head?.querySelector('link[type="application/opensearchdescription+
 
 const disabledEngines = {
   'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini'],
+  'it': ['codeberg'],
 };
 
 const enabledEngines = {
