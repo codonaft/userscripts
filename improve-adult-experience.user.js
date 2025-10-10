@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.31
+// @version 0.32
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -46,7 +46,7 @@ const err = (e, node) => {
 
 const currentTime = _ => Math.round(Date.now() / 1000);
 const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const pickRandom = xs => xs[random(0, xs.length)];
+const pickRandom = xs => xs[random(0, xs.length - 1)];
 
 const timeToSeconds = time => (time || '').trim().split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 

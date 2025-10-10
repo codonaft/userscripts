@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.9
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -50,7 +50,7 @@ const params = {
 };
 
 const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const pickRandom = xs => xs[random(0, xs.length)];
+const pickRandom = xs => xs[random(0, xs.length - 1)];
 const enginesCookie = (engines, excluded) => Object
   .entries(engines)
   .flatMap(([category, v]) => v.filter(i => !excluded.includes(i))
@@ -93,12 +93,9 @@ if (form) {
 Object.entries(cookies).forEach(([k, v]) => document.cookie = `${k}=${v}`);
 
 if (!params.autocomplete) {
-  try {
-    const style = document.createElement('style');
-    style.innerHTML = 'div.autocomplete { display: none !important }';
-    b.appendChild(style);
-  } catch (e) {
-    console.error(e);
+  const autocomplete = b.querySelector('div.autocomplete');
+  if (autocomplete) {
+    autocomplete.style.display = 'none !important';
   }
 }
 })();
