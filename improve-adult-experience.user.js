@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.32
+// @version 0.33
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -27,15 +27,32 @@ if (document.head?.querySelector('link[type="application/opensearchdescription+x
 const UNWANTED = '__unwanted';
 const HIDE = '__hide';
 
+let unmuted = false;
+let pageIsHidden = true;
+let willRedirect = false;
+
 const origin = window.location.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
 const redirect = href => {
+  if (willRedirect) return;
   window.stop();
-  window.location.href = href
+  if (pageIsHidden) {
+    willRedirect = true;
+    window.addEventListener('focus', _ => window.location.href = href, { once: true });
+    return;
+  }
+  window.location.href = href;
 };
 const refresh = _ => redirect(window.location);
 const refreshWithNoHistory = _ => {
+  if (willRedirect) return;
+  console.log('refreshWithNoHistory');
   window.stop();
+  if (pageIsHidden) {
+    willRedirect = true;
+    window.addEventListener('focus', _ => window.location.replace(window.location), { once: true });
+    return;
+  }
   window.location.replace(window.location);
 };
 
@@ -201,7 +218,6 @@ const init = args => {
             video.currentTime = time;
           }
           playIfPaused(video);
-          //video.muted = false; // TODO
           playbackInitiated = true;
         }, { once: true });
 
@@ -213,7 +229,6 @@ const init = args => {
   };
 
   let lastHref = window.location.href;
-  //let focusInterval;
   let disallowGeneralAutoplay = false;
   subscribeOnChanges(body, 'a, div, input, li, span, var, video', (node, _observer) => {
     const newHref = window.location.href;
@@ -224,13 +239,10 @@ const init = args => {
       loadedMetadata = false;
       playbackInitiated = false;
       playbackStarted = false;
-      //if (focusInterval) {
-      //  clearInterval(focusInterval);
-        if (refreshOnPageChange) {
-          refreshWithNoHistory();
-          return true;
-        }
-      //}
+      if (refreshOnPageChange) {
+        refreshWithNoHistory();
+        return false;
+      }
     }
 
     if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
@@ -248,6 +260,7 @@ const init = args => {
       }
 
       document.addEventListener('keydown', event => {
+        pageIsHidden = false;
         if (event.ctrlKey || event.altKey || event.metaKey || document.activeElement.tagName === 'INPUT') return;
 
         if (['KeyS', 'Slash'].includes(event.code)) {
@@ -269,12 +282,10 @@ const init = args => {
         }
       };
 
-      // TODO: subscribe on both?
       if (formOrButton?.tagName === 'BUTTON') {
         formOrButton.addEventListener('click', handleSearch, true);
-      } else {
-        searchForm?.addEventListener('submit', handleSearch, true);
       }
+      searchForm?.addEventListener('submit', handleSearch, true);
       return true;
     }
 
@@ -328,57 +339,94 @@ const init = args => {
 
     console.log('detected main video', video);
 
-    ['loadstart', 'loadedmetadata', 'loadeddata', 'seeked', 'play'].forEach(i => {
+    const maybeUnmute = _ => {
+      if (unmuted || pageIsHidden) return;
+
+      console.log('unmute');
+      video.muted = false;
+      unmuted = true;
+    };
+
+    const maybeSetRandomPosition = _ => {
+      if (RANDOM_POSITION && !playbackStarted && video.duration > 0 && video.currentTime === 0) {
+        console.log('set random position');
+        video.currentTime = random(video.duration / 4, video.duration / 3)
+      }
+    };
+
+    ['loadstart', 'loadeddata', 'seeked'].forEach(i => {
       video.addEventListener(i, _ => {
         console.log(i);
-        if (RANDOM_POSITION && !playbackStarted && video.duration > 0 && video.currentTime === 0) {
-          console.log('set random position');
-          video.currentTime = random(video.duration / 4, video.duration / 3)
-        }
-      });
+        maybeSetRandomPosition();
+      }, { once: true });
     });
 
     video.addEventListener('loadedmetadata', _ => {
-      loadedMetadata = true;
       console.log('loadedmetadata, duration', video.duration);
-    });
+      loadedMetadata = true;
+      maybeSetRandomPosition();
+    }, { once: true });
 
     video.addEventListener('play', _ => {
       console.log('playback is initiated');
       playbackInitiated = true;
-    });
+      maybeSetRandomPosition();
+    }, { once: true });
 
     video.addEventListener('playing', _ => {
       console.log('playback is started')
       playbackStarted = true;
       video.focus();
-    });
+    }, { once: true });
 
-    video.addEventListener('stalled', refresh);
+    video.addEventListener('stalled', _ => {
+      console.log('stalled');
+      refresh();
+    }, { once: true });
 
     if (AUTOPLAY) {
       console.log('setting autoplay');
       video.addEventListener('loadstart', _ => {
         console.log('loadstart autoplay');
+        maybeSetRandomPosition();
         playIfPaused(video);
+      }, { once: true });
+
+      document.addEventListener('mousemove', _ => {
+        console.log('mousemove');
+        pageIsHidden = false;
+        maybeUnmute();
+        if (!playbackStarted) {
+          playIfPaused(video); // TODO: xnxx
+        }
+      }, { once: true });
+
+      document.addEventListener('visibilitychange', _ => {
+        pageIsHidden = document.hidden;
+        console.log('visibilitychange pageIsHidden', pageIsHidden);
+        maybeUnmute();
       }, { once: true });
     }
 
     if (MINOR_IMPROVEMENTS) {
       video.tabindex = -1;
-      // TODO: stop when page is not visible
-      /*focusInterval = setInterval(_ => {
+      setInterval(_ => {
         const active = document.activeElement;
-        if (active !== video && active.tagName !== 'INPUT') {
-          console.log('restore focus to player');
-          video.focus({ preventScroll: true });
+        if (!pageIsHidden && active !== video && active.tagName !== 'INPUT') {
+          console.log('restoring focus to player');
+          video.focus({ preventScroll: true }); // FIXME
         }
-      }, 3000);*/
+      }, 3000);
     }
 
     initializedVideo = true;
-    console.log('load');
-    video.load();
+    if (playSelector) {
+      maybeSetRandomPosition(); // TODO
+      playIfPaused(video);
+    } else {
+      console.log('load');
+      video.load();
+    }
 
     return true;
   });
@@ -492,6 +540,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           console.log('normal player', normalPlayer.duration, normalPlayer.paused, normalPlayer);
           setTimeout(_ => {
             if (normalPlayer.paused) {
+              console.log('still paused, refreshing');
               refresh();
             }
           }, 25000);
@@ -601,14 +650,14 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           if (video.paused) {
             simulateClick(document, playButton);
           }
-        });
+        }, { once: true });
       }
       video.addEventListener('loadedmetadata', _ => {
         if (disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
         video.currentTime = random(video.duration / 4, video.duration / 3);
-      });
+      }, { once: true });
       body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
         if (video.paused) {
           console.log('paused on grid menu');
@@ -900,6 +949,8 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       css: '.gold-plate, .premium-results-line { display: none !important }',
       searchInputSelector: 'input[type="text"][name="k"][placeholder="Search..."], input[type="text"]',
       onSearch: (query, _form) => redirect(`${searchPath}/${query}`),
+      playSelector: 'div#html5video span[title="Play"]',
+      videoSelector: 'div#html5video video',
       // TODO: thumbnailSelector: 'div.thumb',
       // TODO: qualitySelector: 'div.video-hd',
       // TODO: durationSelector: 'span.right',
