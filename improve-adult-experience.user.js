@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.36
+// @version 0.37
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -26,37 +26,28 @@ if (document.head?.querySelector('link[type="application/opensearchdescription+x
 
 const UNWANTED = '__unwanted';
 const HIDE = '__hide';
+const INITIALIZED = '__initialized';
 
 let unmuted = false;
 let pageIsHidden = true;
-let willRedirect = false;
+
+let redirectHref;
+const redirect = (href, force) => {
+  if (force) {
+    window.location.href = href;
+    return;
+  }
+
+  if (redirectHref) return;
+  redirectHref = href;
+  if (!pageIsHidden) {
+    redirect(redirectHref, true);
+  }
+};
+const refresh = force => redirect(window.location, force);
 
 const origin = window.location.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
-const redirect = (href, force) => {
-  if (!force) {
-    if (willRedirect) return;
-    window.stop();
-    if (pageIsHidden) {
-      willRedirect = true;
-      window.addEventListener('focus', _ => window.location.href = href, { once: true });
-      return;
-    }
-  }
-  window.location.href = href;
-};
-const refresh = force => redirect(window.location, force);
-const refreshWithNoHistory = _ => {
-  if (willRedirect) return;
-  console.log('refreshWithNoHistory');
-  window.stop();
-  if (pageIsHidden) {
-    willRedirect = true;
-    window.addEventListener('focus', _ => window.location.replace(window.location), { once: true });
-    return;
-  }
-  window.location.replace(window.location);
-};
 
 const err = (e, node) => {
   console.log(node);
@@ -158,12 +149,27 @@ const init = args => {
   let initializedVideo = false;
   let playbackInitiated = false;
   let playbackStarted = false;
+  let playButtonFailed = false;
+
+  const findPlayButton = video => {
+    const selector = !video.paused && pauseSelector ? pauseSelector : playSelector;
+    return [...body.querySelectorAll(selector)]
+      .filter(i => Number(i.style.opacity || '1') > 0 && i.style.display !== 'none')[0];
+  };
 
   const togglePlay = video => {
     console.log('toggle play');
-    const button = body.querySelector(!video.paused && pauseSelector ? pauseSelector : playSelector);
+    const wasPaused = video.paused;
+    const button = findPlayButton(video);
     try {
-      if (button) {
+      if (button && !playButtonFailed) {
+        setTimeout(_ => {
+          if (!playbackInitiated || video.paused === wasPaused) {
+            console.log('fallback to click simulation');
+            playButtonFailed = true;
+            simulateClick(document, video);
+          }
+        }, 500);
         button.click();
       } else if (video) {
         simulateClick(document, video);
@@ -208,8 +214,7 @@ const init = args => {
   };
 
   let lastHref = window.location.href;
-  let disallowGeneralAutoplay = false;
-  subscribeOnChanges(body, 'a, div, input, li, span, var, video', (node, _observer) => {
+  subscribeOnChanges(body, 'a, div, iframe, input, li, span, var, video', (node, _observer) => {
     const newHref = window.location.href;
     if (newHref !== lastHref) {
       console.log('new page', newHref);
@@ -218,7 +223,7 @@ const init = args => {
       playbackInitiated = false;
       playbackStarted = false;
       if (refreshOnPageChange) {
-        refreshWithNoHistory();
+        refresh();
         return false;
       }
     }
@@ -228,6 +233,7 @@ const init = args => {
       return false;
     }
 
+    const doc = window.top.document;
     if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
       console.log('initializing search input');
       searchInputInitialized = true;
@@ -237,10 +243,14 @@ const init = args => {
         return true;
       }
 
-      document.addEventListener('keydown', event => {
+      doc.addEventListener('keydown', event => {
+        if (!event.isTrusted) return;
         pageIsHidden = false;
-        if (event.ctrlKey || event.altKey || event.metaKey || document.activeElement.tagName === 'INPUT') return;
 
+        if (noKeysOverride?.includes(event.code)) return;
+        if (event.ctrlKey || event.altKey || event.metaKey || doc.activeElement.tagName === 'INPUT') return;
+
+        // TODO: up/down = volume
         if (['KeyS', 'Slash'].includes(event.code)) {
           console.log('use search input');
           event.preventDefault();
@@ -294,12 +304,12 @@ const init = args => {
     }
 
     try {
-      disallowGeneralAutoplay = !!processNode?.(node);
+      processNode?.(node);
     } catch (e) {
       err(e, node);
     }
 
-    if (disallowGeneralAutoplay || initializedVideo || !videoPage || !node.matches(videoSelector || 'video')) return true;
+    if (initializedVideo || !videoPage || !node.matches(videoSelector || 'video, iframe')) return true;
 
     const nonPreviewVideos = [...body.querySelectorAll('video')].filter(i => {
       const text = [...i.classList.values()].join(' ').toLowerCase();
@@ -337,48 +347,53 @@ const init = args => {
       maybeSetRandomPosition();
     }, { once: true });
 
-    video.addEventListener('play', _ => {
-      console.log('playback is initiated');
-      playbackInitiated = true;
-      maybeSetRandomPosition();
-    }, { once: true });
-
     video.addEventListener('playing', _ => {
       console.log('playback is started')
-      playbackStarted = true;
-      video.focus();
+      playbackStarted = true; // TODO: use player property?
+      video.focus({ preventScroll: true });
     }, { once: true });
 
     video.addEventListener('stalled', _ => {
       console.log('stalled');
-      refresh(true);
+      refresh();
     }, { once: true });
 
-    if (AUTOPLAY) {
-      console.log('setting autoplay');
-      const mouseMove = event => {
-        if (!event.isTrusted) return;
-        if (!video.paused) {
-          document.removeEventListener('mousemove', mouseMove);
-          return;
-        }
-
-        console.log('mousemove');
-        pageIsHidden = false;
-        maybeStartAutoplay(video);
-      };
+    const mouseMove = event => {
+      if (!event.isTrusted) return;
+      console.log('mousemove');
+      pageIsHidden = false;
+      maybeStartAutoplay(video);
+    };
+    doc.addEventListener('mousemove', mouseMove);
+    if (doc !== document) {
       document.addEventListener('mousemove', mouseMove);
-
-      document.addEventListener('visibilitychange', _ => {
-        pageIsHidden = document.hidden;
-        console.log('visibilitychange pageIsHidden', pageIsHidden);
-        maybeStartAutoplay(video);
-      }, { once: true });
     }
 
+    video.addEventListener('play', _ => {
+      console.log('playback is initiated');
+      doc.removeEventListener('mousemove', mouseMove);
+      document.removeEventListener('mousemove', mouseMove);
+      playbackInitiated = true; // TODO: use player property?
+      maybeSetRandomPosition();
+    }, { once: true });
+
+    doc.addEventListener('visibilitychange', _ => {
+      pageIsHidden = doc.hidden;
+      if (redirectHref) {
+        redirect(redirectHref, true);
+        return;
+      }
+      console.log('visibilitychange pageIsHidden', pageIsHidden);
+      maybeStartAutoplay(video);
+    }, { once: true });
+
     if (MINOR_IMPROVEMENTS) {
-      document.addEventListener('keydown', event => {
-        if (event.ctrlKey || event.altKey || event.metaKey || ['INPUT', 'VIDEO'].includes(document.activeElement.tagName)) return;
+      doc.addEventListener('keydown', event => {
+        if (!event.isTrusted) return;
+        pageIsHidden = false;
+        maybeStartAutoplay(video);
+
+        if (event.ctrlKey || event.altKey || event.metaKey || ['INPUT', 'VIDEO'].includes(doc.activeElement.tagName)) return;
         if (noKeysOverride?.includes(event.code)) return;
 
         if (['Space', 'KeyP'].includes(event.code)) {
@@ -415,13 +430,13 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   return;
 }
 
-const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
+const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
 
 ({
   'anysex.com': _ => {
     const isVideoUrl = href => href.includes('/video/');
     init({
-      searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"], input[type="text"]',
+      searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"]',
       onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${query}`),
       fullscreenSelector: 'div.main_video_fluid_control_fullscreen',
       thumbnailSelector: 'div.item',
@@ -470,7 +485,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
   },
 
   'pornhub.com': _ => {
-    const playSelector = 'div.mgp_playIcon';
+    const playSelector = 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay';
     const videoSelector = 'video.mgp_videoElement:not(.gifVideo)';
     const durationSelector = 'var.duration, span.duration';
 
@@ -500,7 +515,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       return result;
     };
     const videoId = url => url.searchParams.get('viewkey') || url.pathname.split('/').slice(-1)[0];
-    const isVideoUrl = href => href.includes('/view_video.php');
+    const isVideoUrl = href => href.includes('/view_video.php') || href.includes('/embed/');
     const watchedVideos = new Set;
     const similarVideos = new Set;
 
@@ -533,31 +548,18 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
         container.appendChild(iframe);
       } else {
         console.log('player not found, redirecting to embedded player');
-        window.stop();
-        redirect(embedUrl);
+        redirect(embedUrl, true);
       }
     };
 
-    let disallowGeneralAutoplay = false;
     const processEmbedded = document => {
-      disallowGeneralAutoplay = true;
       const body = document.body;
-      try {
-        const css = 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important }';
-        const styleApplied = !![...body.querySelectorAll('style')].find(i => i.innerHTML === css);
-        if (styleApplied) {
-          console.log('embedded video is already initialized');
-          return;
-        }
-        console.log('applying style');
-        const style = document.createElement('style');
-        style.innerHTML = css;
-        body.appendChild(style);
-      } catch (e) {
-        console.error(e);
+      if (body.classList.contains(INITIALIZED)) {
+        console.log('embedded video is already initialized');
+        return;
       }
+      body.classList.add(INITIALIZED)
 
-      // TODO: use general autoplay?
       try {
         const requiresRefresh = body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page');
         if (requiresRefresh) {
@@ -572,7 +574,6 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       try {
         if (!video) {
           console.log('embedding this video is probably not allowed');
-          window.stop();
 
           if (!isUnwanted(url)) {
             console.log('making single refresh attempt');
@@ -597,32 +598,16 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
         console.error(e);
       }
 
-      const maybeSetRandomPosition = _ => {
-        if (RANDOM_POSITION && video.duration > 0 && video.currentTime === 0) {
-          console.log('set random position');
-          video.currentTime = random(video.duration / 4, video.duration / 3)
-        }
-      }
-
-      const playButton = body.querySelector(playSelector);
-      if (AUTOPLAY) {
-        video.addEventListener('loadstart', _ => {
-          console.log('loadstart');
-          if (video.paused) {
-            maybeSetRandomPosition();
-            simulateClick(document, playButton);
-          }
-        }, { once: true });
-      }
       video.addEventListener('loadedmetadata', _ => {
         console.log('loadedmetadata');
         if (disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
-        maybeSetRandomPosition();
       }, { once: true });
-      body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
-        if (video.paused) {
+
+      body.querySelector('div.mgp_gridMenu')?.addEventListener('click', event => setTimeout(_ => {
+        if (event.isTrusted && video.paused) {
+          const playButton = findPlayButton(video);
           console.log('paused on grid menu');
           simulateClick(document, playButton);
           setTimeout(_ => {
@@ -633,8 +618,6 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
           }, 500);
         }
       }, 100));
-
-      video.load();
     };
 
     const processPreview = node => {
@@ -658,8 +641,12 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
     };
 
     init({
-      css: '#searchSuggestions a:focus { background-color: #111111 !important }',
-      searchInputSelector: 'input#searchInput[type="text"], input[type="text"][name="search"], input[type="text"]', // TODO: multiple selectors for priority?
+      css: `
+        #searchSuggestions a:focus { background-color: #111111 !important }
+        div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important }
+      `,
+      noKeysOverride: ['Space'], // FIXME
+      searchInputSelector: 'input#searchInput[type="text"], input[type="text"][name="search"]',
       onSearch: (query, form) => {
         const url = new URL(form.action);
         searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
@@ -680,7 +667,23 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
           err(e, node);
         }
 
-        if (!validLink(node) || node.closest('ul.filterListItem')) return disallowGeneralAutoplay;
+        if (node.matches('ul#headerMainMenu > li.photos')) {
+          node.classList.add(HIDE);
+          return;
+        }
+
+        if (node.matches('div.mgp_source-unavailable-screen')) {
+          console.log('unavailable sources');
+          refresh();
+          return;
+        }
+
+        if (!validLink(node) || node.closest('ul.filterListItem')) return;
+
+        if (node.href.endsWith('/shorties')) {
+          node.classList.add(HIDE);
+          return;
+        }
 
         const url = new URL(node.href.startsWith('https:') ? node.href : `${origin}${node.href}`);
         const params = url.searchParams;
@@ -692,19 +695,18 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
           if (parts.length === 3) {
             url.pathname = [...parts, 'videos', 'upload'].join('/');
           } else if (!p.endsWith('/videos/upload')) {
-            return disallowGeneralAutoplay;
+            return;
           }
           params.set('o', 'lg');
         } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
           if (parts.length === 3) {
             url.pathname = [...parts, 'videos'].join('/');
           } else if (!p.endsWith('/videos')) {
-            return disallowGeneralAutoplay;
+            return;
           }
           params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
         }
         setTimeout(_ => node.href = url.toString(), 500);
-        return disallowGeneralAutoplay;
       },
     });
 
@@ -788,7 +790,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
   'spankbang.com': _ => {
     init({
       css: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper { display: none !important }',
-      searchInputSelector: 'input#search-input[type="text"], input[type="text"]',
+      searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
       /*onSearch: (query, form) => { // TODO
         const url = new URL(`${origin}/s/${query}/`);
         const params = url.searchParams;
@@ -829,7 +831,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
     const isVideoUrl = href => href.includes('/videos/');
     init({
       css: '.jw-hardlink-inner { display: none !important }',
-      searchInputSelector: 'div.search-input > input[type="text"][placeholder="Search by videos..."], input[type="text"][placeholder="Search by videos..."], input[type="text"]',
+      searchInputSelector: 'div.input-container > input[type="text"], input[type="text"][placeholder="Search..."]',
       playSelector: 'div.jw-icon-playback',
       fullscreenSelector: 'div.jw-icon-fullscreen',
       thumbnailSelector: 'div.thumb',
@@ -873,7 +875,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
     const minDurationMins = 8; // NOTE: content is a disaster here
     init({
       css: '.jw-hardlink-inner { display: none !important }',
-      searchInputSelector: 'input[type="text"][placeholder="Search..."], input[type="text"]',
+      searchInputSelector: 'input[type="text"][placeholder="Search..."], div.search-input > input[type="text"]',
       fullscreenSelector: 'div[role="button"][aria-label="Fullscreen"]',
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
@@ -895,7 +897,6 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
           node.addEventListener('click', _ => {
             // TODO: use as a general solution?
             if (!event.isTrusted) return;
-
             event.preventDefault();
             event.stopImmediatePropagation();
             redirect(url, true);
@@ -909,7 +910,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
     const best = 'hd/full-length/best';
     init({
       css: 'div[data-block="moments"] { display: none !important }',
-      searchInputSelector: 'input[name="q"][type="text"], input[type="text"]',
+      searchInputSelector: 'input[name="q"][type="text"]',
       searchFormOrSubmitButtonSelector: 'form.search-submit-container > button.search-submit[type="submit"], button[type="submit"]',
       onSearch: (query, _form) => {
         const url = new URL(`${origin}/search/${query}`);
@@ -946,7 +947,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
     const containerSelector = 'div#html5video';
     init({
       css: '.gold-plate, .premium-results-line { display: none !important }',
-      searchInputSelector: 'input[type="text"][name="k"][placeholder="Search..."], input[type="text"]',
+      searchInputSelector: 'input.search-input[type="text"][name="k"], div.form-group > input[type="text"][placeholder="Search..."]',
       onSearch: (query, _form) => redirect(`${searchPath}/${query}`),
       playSelector: `${containerSelector} span.player-icon-f[title="Play"]`,
       pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
@@ -980,7 +981,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
   'xvideos.com': _ => {
     init({
       css: 'a.premium, div.p-red, div.quickies-lat { display: none !important }',
-      searchInputSelector: 'input.search-input[type="text"], input[placeholder="Search X videos"], input[type="text"]',
+      searchInputSelector: 'input.search-input[type="text"], input[type="text"][placeholder="Search X videos"]',
       onSearch: (query, form) => {
         const url = new URL(form.action);
         const params = url.searchParams;
