@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.33
+// @version 0.34
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -80,13 +80,13 @@ const getTopNode = (document, node, x, y) => {
   }
 };
 
-const simulateClick = (document, node) => {
+const simulateClick = (document, node, full) => {
   if (!node) return;
   console.log('simulateClick', node);
   try {
     const { target, clientX, clientY } = getTopNode(document, node, 0.5, 0.5);
     console.log('simulateClick target', target, clientX, clientY);
-    ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
+    (full ? ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click'] : ['click'])
       .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
   } catch (e) {
     err(e, node);
@@ -120,10 +120,13 @@ const subscribeOnChanges = (node, selector, f) => {
 const init = args => {
   const {
     css,
+    noKeysOverride,
     searchInputSelector,
     searchFormOrSubmitButtonSelector,
     onSearch,
     playSelector,
+    pauseSelector,
+    fullscreenSelector,
     videoSelector,
     thumbnailSelector,
     qualitySelector,
@@ -155,9 +158,35 @@ const init = args => {
   let loadedMetadata = false;
   let playbackInitiated = false;
   let playbackStarted = false;
-  const playIfPaused = video => {
-    const playButton = body.querySelector(playSelector) || video;
-    if (!video || playbackInitiated || !video.paused) return;
+
+  const togglePlay = video => {
+    console.log('toggle play');
+    const button = body.querySelector(!video.paused && pauseSelector ? pauseSelector : playSelector);
+    try {
+      if (button) {
+        button.click();
+      } else if (video) {
+        simulateClick(document, video, false);
+      } else {
+        console.error('no play button found');
+      }
+    } catch (e) {
+      err(e, button);
+    }
+  };
+
+  const toggleFullscreen = _ => {
+    console.log('toggle fullscreen');
+    const button = body.querySelector(fullscreenSelector)
+    try {
+      button?.click();
+    } catch (e) {
+      err(e, button);
+    }
+  };
+
+  const maybeStartAutoplay = video => {
+    if (!AUTOPLAY || pageIsHidden || playbackInitiated || playbackStarted || !video || !video.paused) return;
 
     if (video.matches('video.jw-video')) {
       console.log('starting jwplayer');
@@ -169,63 +198,13 @@ const init = args => {
       }
     }
 
-    console.log('clicking on play button', playButton, 'for the video', video);
-    //simulateClick(document, playButton);
-    try {
-      playButton.click();
-    } catch (e) {
-      err(e, playButton);
+    if (!unmuted) {
+      console.log('unmute');
+      video.muted = false;
+      unmuted = true;
     }
 
-    if (playbackInitiated || !video.paused) {
-      return;
-    }
-    console.log('fallback');
-    const rect = video.getBoundingClientRect();
-    const offset = rect.width * 0.02;
-    const clientX = rect.x + offset;
-    const clientY = rect.y + rect.height - offset;
-    const cornerPlayButton = document.elementFromPoint(clientX, clientY);
-    if (cornerPlayButton && cornerPlayButton !== video && [...cornerPlayButton.attributes].filter(i => i.textContent.toLowerCase().includes('play')) > 0) {
-      console.log('fallback to corner play button', cornerPlayButton);
-      try {
-        cornerPlayButton.click();
-      } catch (e) {
-        err(e, cornerPlayButton);
-      }
-    } else if (loadedMetadata) {
-      console.log('fallback to play method', video);
-      try {
-        video.play();
-      } catch (e) {
-        err(e, video);
-      }
-    } else {
-      console.log('fallback failure, perhaps main player is incorrectly selected, reloading');
-      try {
-        if (fatalFallback) {
-          console.log('calling fatal fallback');
-          fatalFallback();
-          return;
-        }
-
-        video.addEventListener('loadstart', _ => {
-          console.log('loadstart autoplay fallback');
-          if (RANDOM_POSITION) {
-            const duration = video.duration || (15 * 60);
-            const time = random(duration / 4, duration / 3);
-            console.log('fallback set random position', time);
-            video.currentTime = time;
-          }
-          playIfPaused(video);
-          playbackInitiated = true;
-        }, { once: true });
-
-        video.load();
-      } catch (e) {
-        err(e, video);
-      }
-    }
+    togglePlay(video);
   };
 
   let lastHref = window.location.href;
@@ -339,14 +318,6 @@ const init = args => {
 
     console.log('detected main video', video);
 
-    const maybeUnmute = _ => {
-      if (unmuted || pageIsHidden) return;
-
-      console.log('unmute');
-      video.muted = false;
-      unmuted = true;
-    };
-
     const maybeSetRandomPosition = _ => {
       if (RANDOM_POSITION && !playbackStarted && video.duration > 0 && video.currentTime === 0) {
         console.log('set random position');
@@ -358,6 +329,7 @@ const init = args => {
       video.addEventListener(i, _ => {
         console.log(i);
         maybeSetRandomPosition();
+        maybeStartAutoplay(video);
       }, { once: true });
     });
 
@@ -386,43 +358,48 @@ const init = args => {
 
     if (AUTOPLAY) {
       console.log('setting autoplay');
-      video.addEventListener('loadstart', _ => {
-        console.log('loadstart autoplay');
-        maybeSetRandomPosition();
-        playIfPaused(video);
-      }, { once: true });
+      const mouseMove = _ => {
+        if (!video.paused) {
+          document.removeEventListener('mousemove', mouseMove);
+          return;
+        }
 
-      document.addEventListener('mousemove', _ => {
         console.log('mousemove');
         pageIsHidden = false;
-        maybeUnmute();
-        if (!playbackStarted) {
-          playIfPaused(video); // TODO: xnxx
-        }
-      }, { once: true });
+        maybeStartAutoplay(video);
+      };
+      document.addEventListener('mousemove', mouseMove);
 
       document.addEventListener('visibilitychange', _ => {
         pageIsHidden = document.hidden;
         console.log('visibilitychange pageIsHidden', pageIsHidden);
-        maybeUnmute();
+        maybeStartAutoplay(video);
       }, { once: true });
     }
 
     if (MINOR_IMPROVEMENTS) {
-      video.tabindex = -1;
-      setInterval(_ => {
-        const active = document.activeElement;
-        if (!pageIsHidden && active !== video && active.tagName !== 'INPUT') {
-          console.log('restoring focus to player');
-          video.focus({ preventScroll: true }); // FIXME
+      document.addEventListener('keydown', event => {
+        if (event.ctrlKey || event.altKey || event.metaKey || ['INPUT', 'VIDEO'].includes(document.activeElement.tagName)) return;
+        if (noKeysOverride && noKeysOverride.includes(event.code)) return;
+
+        if (['Space', 'KeyP'].includes(event.code)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          console.log('pressed', event.code);
+          togglePlay(video);
+        } else if (fullscreenSelector && event.code === 'KeyF') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          console.log('pressed', event.code);
+          toggleFullscreen();
         }
-      }, 3000);
+      });
     }
 
     initializedVideo = true;
     if (playSelector) {
       maybeSetRandomPosition(); // TODO
-      playIfPaused(video);
+      maybeStartAutoplay(video);
     } else {
       console.log('load');
       video.load();
@@ -439,12 +416,15 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   return;
 }
 
+const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
+
 ({
   'anysex.com': _ => {
     const isVideoUrl = href => href.includes('/video/');
     init({
       searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"], input[type="text"]',
       onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${query}`),
+      fullscreenSelector: 'div.main_video_fluid_control_fullscreen',
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.item-quality',
       durationSelector: 'div.duration',
@@ -476,6 +456,9 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
 
     const isVideoUrl = href => new URL(href).pathname !== '/';
     init({
+      noKeysOverride: ['Space'],
+      //playSelector: 'button.x-player__play-btn',
+      fullscreenSelector: 'button.x-player__fullscreen-btn',
       thumbnailSelector: 'div.tw-relative[data-testid="unit"]',
       durationSelector: 'span[data-testid="unit-amount"]',
       isUnwantedDuration: text => !text?.includes('FULL '),
@@ -644,28 +627,38 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         console.error(e);
       }
 
+      const maybeSetRandomPosition = _ => {
+        if (RANDOM_POSITION && video.duration > 0 && video.currentTime === 0) {
+          console.log('set random position');
+          video.currentTime = random(video.duration / 4, video.duration / 3)
+        }
+      }
+
       const playButton = body.querySelector(playSelector);
       if (AUTOPLAY) {
         video.addEventListener('loadstart', _ => {
+          console.log('loadstart');
           if (video.paused) {
+            maybeSetRandomPosition();
             simulateClick(document, playButton);
           }
         }, { once: true });
       }
       video.addEventListener('loadedmetadata', _ => {
+        console.log('loadedmetadata');
         if (disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
-        video.currentTime = random(video.duration / 4, video.duration / 3);
+        maybeSetRandomPosition();
       }, { once: true });
       body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
         if (video.paused) {
           console.log('paused on grid menu');
-          simulateClick(document, playButton);
+          simulateClick(document, playButton, true);
           setTimeout(_ => {
             if (video.paused) {
               console.log('still paused');
-              simulateClick(document, playButton);
+              simulateClick(document, playButton, true);
             }
           }, 500);
         }
@@ -793,6 +786,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       searchFormOrSubmitButtonSelector: 'form#search_form > button[type="submit"][aria-label="search"], button[type="submit"]',
       onSearch: (query, _form) => redirect(`${origin}/search/${query}/${ending}`),
       playSelector: 'a.fp-play',
+      fullscreenSelector: 'a.fp-screen',
       thumbnailSelector: 'div.thumb-item, span.video-item',
       qualitySelector: 'span.quality',
       durationSelector: 'div.durations, span.video-item-duration',
@@ -831,7 +825,9 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         params.set('q', 'fhd');
         redirect(url);
       },*/
-      playSelector: 'span.i-play#play-button',
+      playSelector: 'span.i-play#play-button, button.vjs-play-control[title="Play"]',
+      pauseSelector: 'button.vjs-play-control[title="Pause"]',
+      fullscreenSelector: 'button.vjs-fullscreen-control',
       videoSelector: 'video#main_video_player_html5_api',
       thumbnailSelector: 'div[data-testid="video-item"]',
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
@@ -860,6 +856,8 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     init({
       css: '.jw-hardlink-inner { display: none !important }',
       searchInputSelector: 'div.search-input > input[type="text"][placeholder="Search by videos..."], input[type="text"][placeholder="Search by videos..."], input[type="text"]',
+      playSelector: 'div.jw-icon-playback',
+      fullscreenSelector: 'div.jw-icon-fullscreen',
       thumbnailSelector: 'div.thumb',
       qualitySelector: 'div.labels',
       durationSelector: 'div.labels',
@@ -901,6 +899,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     init({
       css: '.jw-hardlink-inner { display: none !important }',
       searchInputSelector: 'input[type="text"][placeholder="Search..."], input[type="text"]',
+      fullscreenSelector: 'div[role="button"][aria-label="Fullscreen"]',
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
       isUnwantedDuration: text => timeToSeconds(text) < minDurationMins * 60,
@@ -945,12 +944,15 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
 
   'xnxx.com': _ => {
     const searchPath = '/search/hits/20min+/fullhd';
+    const containerSelector = 'div#html5video';
     init({
       css: '.gold-plate, .premium-results-line { display: none !important }',
       searchInputSelector: 'input[type="text"][name="k"][placeholder="Search..."], input[type="text"]',
       onSearch: (query, _form) => redirect(`${searchPath}/${query}`),
-      playSelector: 'div#html5video span[title="Play"]',
-      videoSelector: 'div#html5video video',
+      playSelector: `${containerSelector} span.player-icon-f[title="Play"]`,
+      pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
+      fullscreenSelector: `${containerSelector} span.player-icon-f[title="Fullscreen"]`,
+      videoSelector: `${containerSelector} video`,
       // TODO: thumbnailSelector: 'div.thumb',
       // TODO: qualitySelector: 'div.video-hd',
       // TODO: durationSelector: 'span.right',
@@ -990,6 +992,9 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         redirect(url);
       },
       thumbnailSelector: 'div.thumb-inside, div.video-thumb, div.thumb-under, div.video-under',
+      playSelector: 'span.player-icon-f[title="Play"]',
+      pauseSelector: 'span.player-icon-f[title="Pause"]',
+      fullscreenSelector: 'span.player-icon-f[title="Fullscreen"]',
       qualitySelector: 'span.video-hd-mark, span.video-sd-mark',
       durationSelector: 'span.duration',
       isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
@@ -1021,5 +1026,5 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       },
     });
   },
-}[shortDomain] || init)();
+}[shortDomain] || defaultInit)();
 })();
