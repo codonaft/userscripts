@@ -2,22 +2,26 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.9
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // ==/UserScript==
 
 (_ => {
 'use strict';
 
-if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
+let hasResults = true;
+const httpOk = performance.getEntriesByType('navigation')[0]?.responseStatus === 200;
 const b = document.body;
-if (!b) return;
-if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 const loc = window.location;
-if (loc.pathname === '/preferences' || ['/info/', '/stats', '/about'].filter(i => loc.pathname.startsWith(i)).length > 0) return;
+if (httpOk) {
+  if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
+  if (loc.pathname === '/preferences' || ['/info/', '/stats', '/about'].filter(i => loc.pathname.startsWith(i)).length > 0) return;
+} else {
+  hasResults = false;
+}
 
 const queryFromInput = b.querySelector('input#q')?.value || '';
-const hasResults = queryFromInput.length > 0 && (b.querySelector('td.response-time') || !b.querySelector('td.response-error')) && !b.querySelector('div.dialog-error-block')?.innerText.includes('No results were found');
+hasResults = queryFromInput.length > 0 && (b.querySelector('td.response-time') || !b.querySelector('td.response-error')) && !b.querySelector('div.dialog-error-block')?.innerText.includes('No results were found');
 if (hasResults) return;
 
 console.log('no SearXNG results');

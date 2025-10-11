@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.34
+// @version 0.35
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -33,17 +33,19 @@ let willRedirect = false;
 
 const origin = window.location.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
-const redirect = href => {
-  if (willRedirect) return;
-  window.stop();
-  if (pageIsHidden) {
-    willRedirect = true;
-    window.addEventListener('focus', _ => window.location.href = href, { once: true });
-    return;
+const redirect = (href, force) => {
+  if (!force) {
+    if (willRedirect) return;
+    window.stop();
+    if (pageIsHidden) {
+      willRedirect = true;
+      window.addEventListener('focus', _ => window.location.href = href, { once: true });
+      return;
+    }
   }
   window.location.href = href;
 };
-const refresh = _ => redirect(window.location);
+const refresh = force => redirect(window.location, force);
 const refreshWithNoHistory = _ => {
   if (willRedirect) return;
   console.log('refreshWithNoHistory');
@@ -80,13 +82,13 @@ const getTopNode = (document, node, x, y) => {
   }
 };
 
-const simulateClick = (document, node, full) => {
+const simulateClick = (document, node) => {
   if (!node) return;
   console.log('simulateClick', node);
   try {
     const { target, clientX, clientY } = getTopNode(document, node, 0.5, 0.5);
     console.log('simulateClick target', target, clientX, clientY);
-    (full ? ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click'] : ['click'])
+    ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
       .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
   } catch (e) {
     err(e, node);
@@ -166,7 +168,7 @@ const init = args => {
       if (button) {
         button.click();
       } else if (video) {
-        simulateClick(document, video, false);
+        simulateClick(document, video);
       } else {
         console.error('no play button found');
       }
@@ -353,12 +355,13 @@ const init = args => {
 
     video.addEventListener('stalled', _ => {
       console.log('stalled');
-      refresh();
+      refresh(true);
     }, { once: true });
 
     if (AUTOPLAY) {
       console.log('setting autoplay');
-      const mouseMove = _ => {
+      const mouseMove = event => {
+        if (!event.isTrusted) return;
         if (!video.paused) {
           document.removeEventListener('mousemove', mouseMove);
           return;
@@ -409,7 +412,7 @@ const init = args => {
   });
 };
 
-// TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com
+// TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com, mat6tube.com, hypnotube.com
 const shortDomain = window.location.hostname.replace(/^www\./, '');
 if (IGNORE_HOSTS.includes(shortDomain)) {
   console.log(shortDomain, 'is a part of ignore list');
@@ -654,11 +657,11 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       body.querySelector('div.mgp_gridMenu')?.addEventListener('click', _ => setTimeout(_ => {
         if (video.paused) {
           console.log('paused on grid menu');
-          simulateClick(document, playButton, true);
+          simulateClick(document, playButton);
           setTimeout(_ => {
             if (video.paused) {
               console.log('still paused');
-              simulateClick(document, playButton, true);
+              simulateClick(document, playButton);
             }
           }, 500);
         }
@@ -792,6 +795,10 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       durationSelector: 'div.durations, span.video-item-duration',
       isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => {
+        const p = new URL(href).pathname;
+        return p.startsWith('/video/') || (p.startsWith('/playlists/') && p.split('/').length > 3);
+      },
       processNode: node => {
         if (!validLink(node)) return;
 
@@ -832,13 +839,16 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       thumbnailSelector: 'div[data-testid="video-item"]',
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
       isUnwantedDuration: text => (Number(text.split('m')[0]) || 0) < MIN_DURATION_MINS,
+      isVideoUrl: href => href.includes('/video/'),
       processNode: node => {
         if (!validLink(node)) return;
 
         const url = new URL(node.href);
         const params = url.searchParams;
         const p = url.pathname;
-        if (!p.endsWith('/tags') && !p.includes('/playlist/') && !p.includes('/video/') && !(params.has('q') && params.has('d'))) {
+        if (MINOR_IMPROVEMENTS && p === '/gifs') {
+          node.classList.add(HIDE);
+        } else if (!p.endsWith('/tags') && !p.includes('/playlist/') && !p.includes('/video/') && !(params.has('q') && params.has('d'))) {
           if (p === '/') {
             url.pathname = '/trending_videos/'
           }
@@ -871,23 +881,24 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
         const p = url.pathname;
         const params = url.searchParams;
         if (p.startsWith('/search/')) {
-          url.pathname = '/search/1/';
+          const page = Number(p.split('/search/')[1]?.split('/')[0]) || 1;
+          url.pathname = `/search/${page}/`;
           params.set('type', 'hd');
           params.set('duration', '3');
           node.href = url;
-        } else if (['/categories/', '/channel/', '/models/'].filter(i => p.startsWith(i).length > 0)) {
+        } else if (['/categories/', '/channel/', '/models/'].find(i => p.startsWith(i))) {
           const parts = p.split('/');
-          if (parts.length >= 4) {
-            const action = parts[1];
-            const query = parts.slice(-2)[0];
-            if (query) {
-              url.pathname = `/${action}/${query}/1/`;
-              params.set('sort', p.startsWith('/categories/') ? 'top-rated' : 'longest');
-              params.set('date', 'all');
-              params.set('type', 'hd');
-              params.set('duration', '2');
-              node.href = url;
-            }
+          const action = parts[1];
+          const query = parts[2];
+          const page = Number(parts[3]) || 1;
+          if (query) {
+            url.pathname = `/${action}/${query}/${page}/`;
+            const categories = action === 'categories';
+            params.set('sort', categories ? 'top-rated' : 'longest');
+            params.set('date', 'all');
+            params.set('type', 'hd');
+            params.set('duration', categories ? '3' : 'all');
+            node.href = url;
           }
         }
       },
@@ -903,6 +914,30 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
       isUnwantedDuration: text => timeToSeconds(text) < minDurationMins * 60,
+      processNode: node => {
+        if (!validLink(node)) return;
+
+        const url = new URL(node.href);
+        const p = url.pathname;
+        if (p !== '/' && !['/ai', '/categories', '/channels', '/pornstars', '/video-', 'watch-history', '/watch-later'].find(i => p.startsWith(i))) {
+          if (p.includes('/pornstar') && !p.includes('/videos/')) {
+            url.pathname += '/videos';
+          }
+          if (!p.split('/').find(parseFloat)) {
+            url.pathname += '/1/';
+          }
+          url.searchParams.set('sort', 'top-rated');
+          node.href = url;
+          node.addEventListener('click', _ => {
+            // TODO: use as a general solution?
+            if (!event.isTrusted) return;
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            redirect(url, true);
+          }, true);
+        }
+      },
     });
   },
 
@@ -980,7 +1015,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
 
   'xvideos.com': _ => {
     init({
-      css: 'a.premium { display: none !important }',
+      css: 'a.premium, div.p-red, div.quickies-lat { display: none !important }',
       searchInputSelector: 'input.search-input[type="text"], input[placeholder="Search X videos"], input[type="text"]',
       onSearch: (query, form) => {
         const url = new URL(form.action);
@@ -999,6 +1034,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       durationSelector: 'span.duration',
       isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isUnwantedDuration: text => !text.includes('h') && Number(text.split(' min')[0] || 0) < MIN_DURATION_MINS,
+      isVideoUrl: href => new URL(href).pathname.startsWith('/video.'),
       processNode: node => {
         if (node.matches('div.error-dialog div.error-content button') && node.textContent.includes('Retry')) {
           node.click();
@@ -1022,6 +1058,9 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
             url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
             node.href = url.toString();
           }
+        } else if (p.startsWith('/pornstars/')) {
+          url.hash = '_tabVideos';
+          node.href = url.toString();
         }
       },
     });
