@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.35
+// @version 0.36
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -138,7 +138,6 @@ const init = args => {
     isUnwantedUrl,
     isVideoUrl,
     refreshOnPageChange,
-    fatalFallback,
     processNode,
   } = args || {};
 
@@ -157,7 +156,6 @@ const init = args => {
 
   let searchInputInitialized = false;
   let initializedVideo = false;
-  let loadedMetadata = false;
   let playbackInitiated = false;
   let playbackStarted = false;
 
@@ -217,7 +215,6 @@ const init = args => {
       console.log('new page', newHref);
       lastHref = newHref;
       initializedVideo = false;
-      loadedMetadata = false;
       playbackInitiated = false;
       playbackStarted = false;
       if (refreshOnPageChange) {
@@ -337,7 +334,6 @@ const init = args => {
 
     video.addEventListener('loadedmetadata', _ => {
       console.log('loadedmetadata, duration', video.duration);
-      loadedMetadata = true;
       maybeSetRandomPosition();
     }, { once: true });
 
@@ -383,7 +379,7 @@ const init = args => {
     if (MINOR_IMPROVEMENTS) {
       document.addEventListener('keydown', event => {
         if (event.ctrlKey || event.altKey || event.metaKey || ['INPUT', 'VIDEO'].includes(document.activeElement.tagName)) return;
-        if (noKeysOverride && noKeysOverride.includes(event.code)) return;
+        if (noKeysOverride?.includes(event.code)) return;
 
         if (['Space', 'KeyP'].includes(event.code)) {
           event.preventDefault();
@@ -520,35 +516,6 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
     const fatalFallback = _ => {
       console.log('fallback to embedded player');
       const container = body.querySelector('div.playerFlvContainer');
-      try {
-        const normalPlayer = body.querySelector(videoSelector);
-        if (normalPlayer) {
-          console.log('normal player', normalPlayer.duration, normalPlayer.paused, normalPlayer);
-          setTimeout(_ => {
-            if (normalPlayer.paused) {
-              console.log('still paused, refreshing');
-              refresh();
-            }
-          }, 25000);
-          return;
-          /*if (!normalPlayer.paused) {
-            const playButton = body.querySelector(playSelector);
-            playButton?.click();
-            console.log('stopped the normal player with button', playButton);
-          }*/
-          //normalPlayer.volume = 0;
-          //normalPlayer.muted = true;
-          //if (isFinite(normalPlayer.duration)) {
-          //  normalPlayer.currentTime = normalPlayer.duration;
-          //  console.log('set normal player currentTime to end');
-          //}
-        }
-        //container?.querySelectorAll('*').forEach(i => i.classList.add(HIDE));
-        //console.log('stopped and hidden the original player');
-      } catch (e) {
-        console.error(e);
-      }
-
       const embedUrl = `${origin}/embed/${params.get('viewkey')}`;
       if (container) {
         const iframe = document.createElement('iframe');
@@ -610,7 +577,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
           if (!isUnwanted(url)) {
             console.log('making single refresh attempt');
             setUnwanted(url, currentTime() + 60 * 60);
-            redirect(url);
+            redirect(url, true);
             return;
           }
 
@@ -619,7 +586,7 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
             const newSimilarVideos = similarVideos.difference(watchedVideos);
             const href = pickRandom(newSimilarVideos.size > 0 ? [...newSimilarVideos] : [...similarVideos]);
             if (href) {
-              redirect(href);
+              redirect(href, true);
             }
           } else {
             console.log('giving up');
@@ -706,7 +673,6 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isUnwantedUrl: url => isUnwanted(url),
       isVideoUrl,
-      fatalFallback,
       processNode: node => {
         try {
           processPreview(node);
@@ -762,14 +728,12 @@ const defaultInit = _ => init({noKeysOverride: ['KeyF', 'KeyP', 'Space']});
           params.set('t', random(durationFromNormalPlayer / 4, durationFromNormalPlayer / 3));
           window.location.replace(url);
         } else {
-          setTimeout(_ => {
-            const normalPlayer = body.querySelector(videoSelector);
-            const error = normalPlayer?.error;
-            if (!normalPlayer || error) {
-              console.log('normal player has failed anyway', error, normalPlayer);
-              fatalFallback();
-            }
-          }, 25000);
+          const normalPlayer = body.querySelector(videoSelector);
+          const error = normalPlayer?.error;
+          if (!normalPlayer || error) {
+            console.log('normal player has failed', error, normalPlayer);
+            fatalFallback();
+          }
         }
       } else {
         console.log('no duration from normal player, calling fatal fallback');
