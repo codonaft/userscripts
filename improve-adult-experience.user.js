@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.37
+// @version 0.38
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -58,7 +58,7 @@ const currentTime = _ => Math.round(Date.now() / 1000);
 const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 const pickRandom = xs => xs[random(0, xs.length - 1)];
 
-const timeToSeconds = time => (time || '').trim().split(':').map(Number).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
+const timeToSeconds = time => (time || '').trim().split(':').map(parseFloat).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
 
 const getTopNode = (document, node, x, y) => {
   if (!node) return;
@@ -73,14 +73,28 @@ const getTopNode = (document, node, x, y) => {
   }
 };
 
-const simulateClick = (document, node) => {
+const focus = (node, onFocus) => {
   if (!node) return;
-  console.log('simulateClick', node);
+  if (!node.hasAttribute('tabindex')) {
+    node.setAttribute('tabindex', 1);
+  }
+
+  // TODO
+  /*const { target } = getTopNode(document, node, 0.5, 0.5);
+  target.focus({ preventScroll: true });*/
+
+  node.focus({ preventScroll: true });
+};
+
+const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) => {
+  if (!node) return;
+  if (events.length === 0) return;
+
+  console.log('simulateMouse', node, events);
   try {
     const { target, clientX, clientY } = getTopNode(document, node, 0.5, 0.5);
-    console.log('simulateClick target', target, clientX, clientY);
-    ['mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']
-      .forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true })))
+    console.log('simulateMouse target', target, clientX, clientY);
+    events.forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true, cancelable: true })));
   } catch (e) {
     err(e, node);
   }
@@ -129,7 +143,7 @@ const init = args => {
     isUnwantedUrl,
     isVideoUrl,
     refreshOnPageChange,
-    processNode,
+    processNode, // TODO: onNodeChange
   } = args || {};
 
   try {
@@ -149,43 +163,74 @@ const init = args => {
   let initializedVideo = false;
   let playbackInitiated = false;
   let playbackStarted = false;
-  let playButtonFailed = false;
 
   const findPlayButton = video => {
     const selector = !video.paused && pauseSelector ? pauseSelector : playSelector;
     return [...body.querySelectorAll(selector)]
-      .filter(i => Number(i.style.opacity || '1') > 0 && i.style.display !== 'none')[0];
+      .filter(i => parseFloat(i.style.opacity || '1') > 0 && i.style.display !== 'none')[0];
   };
 
+  let playStrategy = 0;
   const togglePlay = video => {
-    console.log('toggle play');
-    const wasPaused = video.paused;
-    const button = findPlayButton(video);
+    let button;
     try {
-      if (button && !playButtonFailed) {
+      console.log('toggle play');
+      button = findPlayButton(video);
+      const strategies = [
+        _ => button?.click(),
+        _ => simulateMouse(document, video), // TODO: second attempt?
+      ];
+
+      let attempt = 0;
+      const state = video.paused;
+      const nextStrategyIfFailed = _ => {
         setTimeout(_ => {
-          if (!playbackInitiated || video.paused === wasPaused) {
-            console.log('fallback to click simulation');
-            playButtonFailed = true;
-            simulateClick(document, video);
-          }
-        }, 500);
-        button.click();
-      } else if (video) {
-        simulateClick(document, video);
-      } else {
-        console.error('no play button found');
-      }
+          if (state !== video.paused || attempt >= strategies.length) return;
+
+          attempt++;
+          playStrategy = (playStrategy + 1) % strategies.length;
+          console.log('fallback play strategy', playStrategy);
+          togglePlay(video);
+        }, 300); // TODO: smaller timeout?
+      };
+
+      strategies[playStrategy]();
+      nextStrategyIfFailed();
     } catch (e) {
       err(e, button);
     }
   };
 
-  const toggleFullscreen = _ => {
-    console.log('toggle fullscreen');
-    const button = body.querySelector(fullscreenSelector)
+  let fullscreenStrategy = 0;
+  const toggleFullscreen = video => {
+    let button;
     try {
-      button?.click();
+      console.log('toggle fullscreen');
+      button = body.querySelector(fullscreenSelector);
+      const strategies = [
+        _ => button?.click(),
+        _ => simulateMouse(document, button),
+        _ => {
+          simulateMouse(document, video)
+          setTimeout(_ => simulateMouse(document, video, ['mousedown', 'mouseup', 'click']), 2); // TODO: smaller timeout?
+        },
+      ];
+
+      let attempt = 0;
+      const state = !!document.fullscreenElement;
+      const nextStrategyIfFailed = _ => {
+        setTimeout(_ => {
+          if (state !== !!document.fullscreenElement || attempt >= strategies.length) return;
+
+          attempt++;
+          fullscreenStrategy = (fullscreenStrategy + 1) % strategies.length;
+          console.log('fallback fullscreen strategy', fullscreenStrategy);
+          toggleFullscreen(video);
+        }, 10); // TODO: smaller timeout?
+      };
+
+      strategies[fullscreenStrategy]();
+      nextStrategyIfFailed();
     } catch (e) {
       err(e, button);
     }
@@ -233,7 +278,12 @@ const init = args => {
       return false;
     }
 
-    const doc = window.top.document;
+    const docs = [window.top.document];
+    if (docs[0] !== document) {
+      docs.push(document);
+    }
+
+    let searchInputKeyDown;
     if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
       console.log('initializing search input');
       searchInputInitialized = true;
@@ -243,20 +293,15 @@ const init = args => {
         return true;
       }
 
-      doc.addEventListener('keydown', event => {
-        if (!event.isTrusted) return;
-        pageIsHidden = false;
-
-        if (noKeysOverride?.includes(event.code)) return;
-        if (event.ctrlKey || event.altKey || event.metaKey || doc.activeElement.tagName === 'INPUT') return;
-
+      searchInputKeyDown = event => {
         // TODO: up/down = volume
-        if (['KeyS', 'Slash'].includes(event.code)) {
+        if (searchInput && ['KeyS', 'Slash'].includes(event.code)) {
           console.log('use search input');
           event.preventDefault();
+          focus(searchInput);
           searchInput.focus();
         }
-      });
+      };
 
       const formOrButton = body.querySelector(searchFormOrSubmitButtonSelector);
       const searchForm = formOrButton?.tagName === 'FORM' ? formOrButton : (node.closest('form') || formOrButton?.closest('form'));
@@ -350,7 +395,7 @@ const init = args => {
     video.addEventListener('playing', _ => {
       console.log('playback is started')
       playbackStarted = true; // TODO: use player property?
-      video.focus({ preventScroll: true });
+      focus(video);
     }, { once: true });
 
     video.addEventListener('stalled', _ => {
@@ -364,51 +409,51 @@ const init = args => {
       pageIsHidden = false;
       maybeStartAutoplay(video);
     };
-    doc.addEventListener('mousemove', mouseMove);
-    if (doc !== document) {
-      document.addEventListener('mousemove', mouseMove);
-    }
+    docs.forEach(d => {
+      d.addEventListener('mousemove', mouseMove);
+      d.addEventListener('visibilitychange', _ => {
+        pageIsHidden = d.hidden;
+        if (redirectHref && !pageIsHidden) {
+          redirect(redirectHref, true);
+          return;
+        }
+        console.log('visibilitychange pageIsHidden', pageIsHidden);
+        maybeStartAutoplay(video);
+      }, { once: true });
+    });
 
     video.addEventListener('play', _ => {
       console.log('playback is initiated');
-      doc.removeEventListener('mousemove', mouseMove);
-      document.removeEventListener('mousemove', mouseMove);
+      docs.forEach(d => d.removeEventListener('mousemove', mouseMove));
       playbackInitiated = true; // TODO: use player property?
       maybeSetRandomPosition();
     }, { once: true });
 
-    doc.addEventListener('visibilitychange', _ => {
-      pageIsHidden = doc.hidden;
-      if (redirectHref) {
-        redirect(redirectHref, true);
-        return;
-      }
-      console.log('visibilitychange pageIsHidden', pageIsHidden);
+    docs.forEach(d => { d.addEventListener('keydown', event => {
+      if (!event.isTrusted) return;
+      pageIsHidden = false;
       maybeStartAutoplay(video);
-    }, { once: true });
 
-    if (MINOR_IMPROVEMENTS) {
-      doc.addEventListener('keydown', event => {
-        if (!event.isTrusted) return;
-        pageIsHidden = false;
-        maybeStartAutoplay(video);
+      if (noKeysOverride?.includes(event.code)) return;
+      if (event.ctrlKey || event.altKey || event.metaKey || d.activeElement.tagName === 'INPUT') return;
 
-        if (event.ctrlKey || event.altKey || event.metaKey || ['INPUT', 'VIDEO'].includes(doc.activeElement.tagName)) return;
-        if (noKeysOverride?.includes(event.code)) return;
-
+      console.log('keydown', event.code); // TODO
+      if (MINOR_IMPROVEMENTS) {
+        searchInputKeyDown?.(event);
         if (['Space', 'KeyP'].includes(event.code)) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          console.log('pressed', event.code);
           togglePlay(video);
         } else if (fullscreenSelector && event.code === 'KeyF') {
           event.preventDefault();
           event.stopImmediatePropagation();
           console.log('pressed', event.code);
-          toggleFullscreen();
+          toggleFullscreen(video);
+        } else {
+          focus(video);
         }
-      });
-    }
+      }
+    }, true); });
 
     initializedVideo = true;
     if (playSelector) {
@@ -430,7 +475,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   return;
 }
 
-const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
+const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 
 ({
   'anysex.com': _ => {
@@ -438,12 +483,12 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
     init({
       searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"]',
       onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${query}`),
-      fullscreenSelector: 'div.main_video_fluid_control_fullscreen',
+      fullscreenSelector: 'div#main_video_fluid_control_fullscreen',
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.item-quality',
       durationSelector: 'div.duration',
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
-      isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
+      isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isVideoUrl,
       processNode: node => {
         if (!validLink(node) || node.closest('div.sort')) return;
@@ -460,8 +505,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
   'beeg.com': _ => {
     const cookie = document.cookie;
     const qualityPattern = 'video__quality=';
-    const quality = Number(cookie.split(qualityPattern)[1]?.split(';')[0]) || 0;
-    if (quality > 0 && quality < MIN_VIDEO_HEIGHT) {
+    const quality = parseFloat(cookie.split(qualityPattern)[1]?.split(';')[0]);
+    if (isNaN(quality) && quality < MIN_VIDEO_HEIGHT) {
       console.log('wrong quality', quality);
       document.cookie = `${qualityPattern}${MIN_VIDEO_HEIGHT}`;
       refresh();
@@ -529,6 +574,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
     });
 
     const fatalFallback = _ => {
+      // TODO: open the same video in the new window and close the old one?
       console.log('fallback to embedded player');
       const container = body.querySelector('div.playerFlvContainer');
       const embedUrl = `${origin}/embed/${params.get('viewkey')}`;
@@ -548,7 +594,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
         container.appendChild(iframe);
       } else {
         console.log('player not found, redirecting to embedded player');
-        redirect(embedUrl, true);
+        redirect(embedUrl);
       }
     };
 
@@ -560,42 +606,33 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
       }
       body.classList.add(INITIALIZED)
 
-      try {
-        const requiresRefresh = body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page');
-        if (requiresRefresh) {
-          console.log('refreshing after error');
-          refresh();
-        }
-      } catch (e) {
-        console.error(e);
+      if (body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page')) {
+        console.log('refreshing after error');
+        refresh();
       }
 
       const video = body.querySelector('video');
-      try {
-        if (!video) {
-          console.log('embedding this video is probably not allowed');
+      if (!video) {
+        console.log('embedding this video is probably not allowed');
 
-          if (!isUnwanted(url)) {
-            console.log('making single refresh attempt');
-            setUnwanted(url, currentTime() + 60 * 60);
-            redirect(url, true);
-            return;
-          }
-
-          if (similarVideos.size > 0) {
-            console.log('redirecting to a random non-unwanted similar video');
-            const newSimilarVideos = similarVideos.difference(watchedVideos);
-            const href = pickRandom(newSimilarVideos.size > 0 ? [...newSimilarVideos] : [...similarVideos]);
-            if (href) {
-              redirect(href, true);
-            }
-          } else {
-            console.log('giving up');
-          }
+        if (!isUnwanted(url)) {
+          console.log('making single refresh attempt');
+          setUnwanted(url, currentTime() + 60 * 60);
+          redirect(url, true);
           return;
         }
-      } catch (e) {
-        console.error(e);
+
+        if (similarVideos.size > 0) {
+          console.log('redirecting to a random non-unwanted similar video');
+          const newSimilarVideos = similarVideos.difference(watchedVideos);
+          const href = pickRandom(newSimilarVideos.size > 0 ? [...newSimilarVideos] : [...similarVideos]);
+          if (href) {
+            redirect(href, true);
+          }
+        } else {
+          console.log('giving up');
+        }
+        return;
       }
 
       video.addEventListener('loadedmetadata', _ => {
@@ -604,20 +641,6 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
       }, { once: true });
-
-      body.querySelector('div.mgp_gridMenu')?.addEventListener('click', event => setTimeout(_ => {
-        if (event.isTrusted && video.paused) {
-          const playButton = findPlayButton(video);
-          console.log('paused on grid menu');
-          simulateClick(document, playButton);
-          setTimeout(_ => {
-            if (video.paused) {
-              console.log('still paused');
-              simulateClick(document, playButton);
-            }
-          }, 500);
-        }
-      }, 100));
     };
 
     const processPreview = node => {
@@ -631,9 +654,6 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
       const link = node?.closest('a');
       if (!link || !isVideoUrl(link.href)) return;
 
-      const t = random(duration / 4, duration / 3);
-      link.href += `&t=${t}`;
-
       if (link.querySelector('div.watchedVideoText')) {
         watchedVideos.add(link.href);
       }
@@ -643,9 +663,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
     init({
       css: `
         #searchSuggestions a:focus { background-color: #111111 !important }
-        div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub { display: none !important }
+        div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub, div.mgp_gridMenu { display: none !important }
       `,
-      noKeysOverride: ['Space'], // FIXME
       searchInputSelector: 'input#searchInput[type="text"], input[type="text"][name="search"]',
       onSearch: (query, form) => {
         const url = new URL(form.action);
@@ -654,6 +673,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
         redirect(url);
       },
       playSelector,
+      fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
       videoSelector,
       thumbnailSelector: 'div.phimage, li:has(span.info-wrapper)',
       durationSelector,
@@ -725,17 +745,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
         }
 
-        if (!params.has('t') || Number(params.get('t')) >= durationFromNormalPlayer) {
-          window.stop();
-          params.set('t', random(durationFromNormalPlayer / 4, durationFromNormalPlayer / 3));
-          window.location.replace(url);
-        } else {
-          const normalPlayer = body.querySelector(videoSelector);
-          const error = normalPlayer?.error;
-          if (!normalPlayer || error) {
-            console.log('normal player has failed', error, normalPlayer);
-            fatalFallback();
-          }
+        const normalPlayer = body.querySelector(videoSelector);
+        const error = normalPlayer?.error;
+        if (!normalPlayer || error) {
+          console.log('normal player has failed', error, normalPlayer);
+          fatalFallback();
         }
       } else {
         console.log('no duration from normal player, calling fatal fallback');
@@ -759,7 +773,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
       thumbnailSelector: 'div.thumb-item, span.video-item',
       qualitySelector: 'span.quality',
       durationSelector: 'div.durations, span.video-item-duration',
-      isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
+      isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => {
         const p = new URL(href).pathname;
@@ -804,7 +818,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
       videoSelector: 'video#main_video_player_html5_api',
       thumbnailSelector: 'div[data-testid="video-item"]',
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
-      isUnwantedDuration: text => (Number(text.split('m')[0]) || 0) < MIN_DURATION_MINS,
+      isUnwantedDuration: text => (parseFloat(text.split('m')[0]) || 0) < MIN_DURATION_MINS,
       isVideoUrl: href => href.includes('/video/'),
       processNode: node => {
         if (!validLink(node)) return;
@@ -847,7 +861,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
         const p = url.pathname;
         const params = url.searchParams;
         if (p.startsWith('/search/')) {
-          const page = Number(p.split('/search/')[1]?.split('/')[0]) || 1;
+          const page = parseFloat(p.split('/search/')[1]?.split('/')[0]) || 1;
           url.pathname = `/search/${page}/`;
           params.set('type', 'hd');
           params.set('duration', '3');
@@ -856,7 +870,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
           const parts = p.split('/');
           const action = parts[1];
           const query = parts[2];
-          const page = Number(parts[3]) || 1;
+          const page = parseFloat(parts[3]) || 1;
           if (query) {
             url.pathname = `/${action}/${query}/${page}/`;
             const categories = action === 'categories';
@@ -876,7 +890,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
     init({
       css: '.jw-hardlink-inner { display: none !important }',
       searchInputSelector: 'input[type="text"][placeholder="Search..."], div.search-input > input[type="text"]',
-      fullscreenSelector: 'div[role="button"][aria-label="Fullscreen"]',
+      fullscreenSelector: 'div[role="button"][aria-label="Fullscreen"], div[role="button"][aria-label="Exit Fullscreen"]',
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
       isUnwantedDuration: text => timeToSeconds(text) < minDurationMins * 60,
@@ -956,8 +970,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
       // TODO: thumbnailSelector: 'div.thumb',
       // TODO: qualitySelector: 'div.video-hd',
       // TODO: durationSelector: 'span.right',
-      // TODO: isUnwantedDuration: text => Number(text.split('mins')[0] || 0) < MIN_DURATION_MINS,
-      // TODO: isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
+      // TODO: isUnwantedDuration: text => parseFloat(text.split('mins')[0] || 0) < MIN_DURATION_MINS,
+      // TODO: isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isVideoUrl: href => href.includes('/video-'),
       processNode: node => {
         if (!validLink(node)) return;
@@ -967,7 +981,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
         if (p.startsWith('/search/')) {
           const parts = p.split('/');
           const lastPart = parts.slice(-1)[0] || '';
-          const hasPage = parts.length > 5 && !!Number(lastPart);
+          const hasPage = parts.length > 5 && !!parseFloat(lastPart);
           const page = hasPage ? lastPart : '';
           const query = parts.slice(hasPage ? -2 : -1)[0] || '';
           url.pathname = `${searchPath}/${query}/${page}`;
@@ -997,8 +1011,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'KeyP', 'Space'] });
       fullscreenSelector: 'span.player-icon-f[title="Fullscreen"]',
       qualitySelector: 'span.video-hd-mark, span.video-sd-mark',
       durationSelector: 'span.duration',
-      isUnwantedQuality: text => (Number(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
-      isUnwantedDuration: text => !text.includes('h') && Number(text.split(' min')[0] || 0) < MIN_DURATION_MINS,
+      isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
+      isUnwantedDuration: text => !text.includes('h') && parseFloat(text.split(' min')[0] || 0) < MIN_DURATION_MINS,
       isVideoUrl: href => new URL(href).pathname.startsWith('/video.'),
       processNode: node => {
         if (node.matches('div.error-dialog div.error-content button') && node.textContent.includes('Retry')) {
