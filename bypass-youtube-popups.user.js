@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.user.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
@@ -59,7 +59,6 @@ const subscribeOnChanges = (node, selector, f) => {
       } catch (e) {
         err(e, node);
         if (e.name === 'SecurityError') {
-          console.log('disconnect observer');
           observer.disconnect();
           return;
         }
@@ -75,6 +74,11 @@ const subscribeOnChanges = (node, selector, f) => {
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
   apply(node, observer);
+};
+
+const err = (e, node) => {
+  console.log(node);
+  console.error(e);
 };
 
 subscribeOnChanges(document.body, 'button, div, span', process);

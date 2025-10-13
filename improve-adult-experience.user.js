@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.39
+// @version 0.40
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -12,7 +12,7 @@
 const IGNORE_HOSTS = []; // NOTE: without 'www.', e.g. 'xvideos.com'
 const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if some UI appears to be broken
 
-const AUTOPLAY = true; // NOTE: probably still requires --autoplay-policy=no-user-gesture-required in chromium-like browsers to work properly
+const AUTOPLAY = true;
 const HIDE_EXTERNAL_LINKS = true;
 const RANDOM_POSITION = true;
 
@@ -73,7 +73,7 @@ const getTopNode = (document, node, x, y) => {
   }
 };
 
-const focus = (node, onFocus) => {
+const focus = (node, scrollTo) => {
   if (!node) return;
   if (!node.hasAttribute('tabindex')) {
     node.setAttribute('tabindex', 1);
@@ -83,7 +83,8 @@ const focus = (node, onFocus) => {
   /*const { target } = getTopNode(document, node, 0.5, 0.5);
   target.focus({ preventScroll: true });*/
 
-  node.focus({ preventScroll: true });
+  const preventScroll = !scrollTo; // TODO: always true?
+  node.focus({ preventScroll });
 };
 
 const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) => {
@@ -111,7 +112,6 @@ const subscribeOnChanges = (node, selector, f) => {
       } catch (e) {
         err(e, node);
         if (e.name === 'SecurityError') {
-          console.log('disconnect observer');
           observer.disconnect();
           return;
         }
@@ -130,6 +130,7 @@ const subscribeOnChanges = (node, selector, f) => {
 };
 
 const init = args => {
+  const defaultVideoSelector = 'video';
   const {
     css,
     noKeysOverride,
@@ -139,7 +140,6 @@ const init = args => {
     playSelector,
     pauseSelector,
     fullscreenSelector,
-    videoSelector,
     thumbnailSelector,
     qualitySelector,
     durationSelector,
@@ -149,7 +149,11 @@ const init = args => {
     isVideoUrl,
     refreshOnPageChange,
     processNode, // TODO: onNodeChange
-  } = args || {};
+  } = args || {
+    noKeysOverride: ['KeyF', 'Space'],
+    videoSelector: defaultVideoSelector,
+  };
+  const videoSelector = args?.videoSelector || defaultVideoSelector;
 
   try {
     const style = document.createElement('style');
@@ -244,8 +248,8 @@ const init = args => {
   const maybeStartAutoplay = video => {
     if (!AUTOPLAY || pageIsHidden || playbackInitiated || playbackStarted || !video || !video.paused) return;
 
-    if (video.matches('video.jw-video')) {
-      console.log('starting jwplayer');
+    if (video.matches('video.jw-video, video.js-player')) {
+      console.log('starting playback');
       // TODO: kt_player? etc.
       try {
         video.play();
@@ -264,6 +268,7 @@ const init = args => {
     togglePlay(video);
   };
 
+  let searchInputKeyDown;
   let lastHref = window.location.href;
   subscribeOnChanges(body, 'a, div, iframe, input, li, span, var, video', (node, _observer) => {
     const newHref = window.location.href;
@@ -289,7 +294,6 @@ const init = args => {
       docs.push(document);
     }
 
-    let searchInputKeyDown;
     if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
       console.log('initializing search input');
       searchInputInitialized = true;
@@ -302,10 +306,11 @@ const init = args => {
       searchInputKeyDown = event => {
         // TODO: up/down = volume
         if (searchInput && ['KeyS', 'Slash'].includes(event.code)) {
-          console.log('use search input');
+          console.log('use search input', searchInput);
           event.preventDefault();
-          focus(searchInput);
-          searchInput.focus();
+          searchInput.focus(); // TODO
+          //focus(searchInput, true);
+          //simulateMouse(document, searchInput);
         }
       };
 
@@ -332,7 +337,7 @@ const init = args => {
     const videoPage = url.pathname !== '/' && (!isVideoUrl || isVideoUrl(url.href));
 
     try {
-      if (AUTOPLAY && !playbackInitiated && videoPage && playSelector && !videoSelector && node.matches(playSelector) && !body.querySelector('video')) {
+      if (AUTOPLAY && !playbackInitiated && videoPage && playSelector && node.matches(playSelector) && !body.querySelector(videoSelector)) {
         console.log('detected play button while there is no video node yet', node);
         setTimeout(_ => node.click(), 1);
         return true;
@@ -360,28 +365,31 @@ const init = args => {
       err(e, node);
     }
 
-    if (initializedVideo || !videoPage || !node.matches(videoSelector || 'video, iframe')) return true;
+    if (initializedVideo || !videoPage || !node.matches(videoSelector)) return true;
 
-    const nonPreviewVideos = [...body.querySelectorAll('video')].filter(i => {
+    const nonPreviewVideos = [...body.querySelectorAll(videoSelector)].filter(i => {
       const text = [...i.classList.values()].join(' ').toLowerCase();
       return !i.hasAttribute('loop') && !text.includes('preview') && !text.includes('lazyload');
     });
-    const video = body.querySelector(videoSelector) || (
-       nonPreviewVideos
-        .filter(i => i.offsetHeight > 0)
-        .sort((a, b) => b.offsetHeight - a.offsetHeight)[0] || nonPreviewVideos[0]
-    );
-    if (!video) {
-      console.log('no video');
+    const sortedVideos = nonPreviewVideos
+      .filter(i => i.offsetHeight > 0)
+      .sort((a, b) => b.offsetHeight - a.offsetHeight);
+
+    let video;
+    if (sortedVideos.length > 1 && sortedVideos[0].offsetHeight - sortedVideos[1].offsetHeight > screen.height * 0.1) {
+      video = sortedVideos[0];
+    } else if (nonPreviewVideos.length === 1 || sortedVideos.length === 0) {
+      video = nonPreviewVideos[0];
+    } else {
+      console.log('no video', nonPreviewVideos);
       return true;
     }
-
     console.log('detected main video', video);
 
     const maybeSetRandomPosition = _ => {
       if (RANDOM_POSITION && !playbackStarted && video.duration > 0 && video.currentTime === 0) {
         console.log('set random position');
-        video.currentTime = random(video.duration / 4, video.duration / 3)
+        video.currentTime = random(video.duration * 0.25, video.duration * 0.3);
       }
     };
 
@@ -481,8 +489,6 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
   return;
 }
 
-const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
-
 ({
   'anysex.com': _ => {
     const isVideoUrl = href => href.includes('/video/');
@@ -512,7 +518,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const cookie = document.cookie;
     const qualityPattern = 'video__quality=';
     const quality = parseFloat(cookie.split(qualityPattern)[1]?.split(';')[0]);
-    if (isNaN(quality) && quality < MIN_VIDEO_HEIGHT) {
+    if (Number.isNaN(quality) && quality < MIN_VIDEO_HEIGHT) {
       console.log('wrong quality', quality);
       document.cookie = `${qualityPattern}${MIN_VIDEO_HEIGHT}`;
       refresh();
@@ -693,7 +699,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           err(e, node);
         }
 
-        if (node.matches('ul#headerMainMenu > li.photos')) {
+        if (node.matches('ul#headerMainMenu li.photos')) {
           node.classList.add(HIDE);
           return;
         }
@@ -745,7 +751,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     } else if (isVideoUrl(p)) {
       const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
       if (durationFromNormalPlayer) {
-        const lowQuality = ![...body.querySelectorAll('ul.mgp_quality > li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
+        const lowQuality = ![...body.querySelectorAll('ul.mgp_quality li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
         console.log('low quality', lowQuality);
         if (lowQuality || disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
@@ -772,7 +778,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       // TODO: css: 'div.sort-holder { display: none !important }',
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
-      searchFormOrSubmitButtonSelector: 'form#search_form > button[type="submit"][aria-label="search"], button[type="submit"]',
+      searchFormOrSubmitButtonSelector: 'form#search_form button[type="submit"][aria-label="search"], button[type="submit"][aria-label="search"]',
       onSearch: (query, _form) => redirect(`${origin}/search/${query}/${ending}`),
       playSelector: 'a.fp-play',
       fullscreenSelector: 'a.fp-screen',
@@ -851,7 +857,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const isVideoUrl = href => href.includes('/videos/');
     init({
       css: '.jw-hardlink-inner { display: none !important }',
-      searchInputSelector: 'div.input-container > input[type="text"], input[type="text"][placeholder="Search..."]',
+      searchInputSelector: 'div.input-container input[type="text"], input[type="text"][placeholder="Search..."]', // TODO: document.querySelector('div.search button.btn-open-search').click()
       playSelector: 'div.jw-icon-playback',
       fullscreenSelector: 'div.jw-icon-fullscreen',
       thumbnailSelector: 'div.thumb',
@@ -895,7 +901,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const minDurationMins = 8; // NOTE: content is a disaster here
     init({
       css: '.jw-hardlink-inner { display: none !important }',
-      searchInputSelector: 'input[type="text"][placeholder="Search..."], div.search-input > input[type="text"]',
+      searchInputSelector: 'div.search-input input[type="text"], input[type="text"][placeholder="Search..."]',
       fullscreenSelector: 'div[role="button"][aria-label="Fullscreen"], div[role="button"][aria-label="Exit Fullscreen"]',
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
@@ -915,7 +921,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           url.searchParams.set('sort', 'top-rated');
           node.href = url;
           node.addEventListener('click', _ => {
-            // TODO: use as a general solution?
+            // TODO: use as a general solution for all updated links?
             if (!event.isTrusted) return;
             event.preventDefault();
             event.stopImmediatePropagation();
@@ -932,7 +938,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       css: 'div[data-block="moments"] { display: none !important }',
       searchInputSelector: 'input[name="q"][type="text"]',
-      searchFormOrSubmitButtonSelector: 'form.search-submit-container > button.search-submit[type="submit"], button[type="submit"]',
+      searchFormOrSubmitButtonSelector: 'form.search-submit-container button[type="submit"], button.search-submit[type="submit"]',
       onSearch: (query, _form) => {
         const url = new URL(`${origin}/search/${query}`);
         const params = url.searchParams;
@@ -968,7 +974,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const containerSelector = 'div#html5video';
     init({
       css: '.gold-plate, .premium-results-line { display: none !important }',
-      searchInputSelector: 'input.search-input[type="text"][name="k"], div.form-group > input[type="text"][placeholder="Search..."]',
+      searchInputSelector: 'input.search-input[type="text"][name="k"], div.form-group input[type="text"][placeholder="Search..."]',
       onSearch: (query, _form) => redirect(`${searchPath}/${query}`),
       playSelector: `${containerSelector} span.player-icon-f[title="Play"]`,
       pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
@@ -1051,5 +1057,5 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       },
     });
   },
-}[shortDomain] || defaultInit)();
+}[shortDomain] || init)();
 })();

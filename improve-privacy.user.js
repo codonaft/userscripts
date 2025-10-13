@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.13
+// @version 0.14
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -57,7 +57,6 @@ const subscribeOnChanges = (node, selector, f) => {
       } catch (e) {
         err(e, node);
         if (e.name === 'SecurityError') {
-          console.log('disconnect observer');
           observer.disconnect();
           return;
         }
@@ -75,11 +74,6 @@ const subscribeOnChanges = (node, selector, f) => {
   apply(node, observer);
 };
 
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
-};
-
 subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {
   try {
     const h = window.location.hostname;
@@ -93,4 +87,9 @@ subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) 
 
   return cleanup(node);
 });
+
+const err = (e, node) => {
+  console.log(node);
+  console.error(e);
+};
 })();

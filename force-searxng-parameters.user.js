@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.11
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -39,13 +39,14 @@ const DISALBED_ENGINES = {
 const ENABLED_PLUGINS = ['calculator', 'oa_doi_rewrite', 'tracker_url_remover', 'Vim-like_hotkeys'];
 
 const disabledEnginesFlat = Object.values(DISALBED_ENGINES).flat();
+const disabledEnginesSet = new Set(disabledEnginesFlat);
 
 // https://docs.searxng.org/dev/search_api.html
 const params = {
   'autocomplete': '',
   'categories': CATEGORIES.join(','),
   'disabled_engines': disabledEnginesFlat.join(','),
-  'enabled_engines': Object.values(ENABLED_ENGINES).flat().filter(i => !disabledEnginesFlat.includes(i)).join(','),
+  'enabled_engines': Object.values(ENABLED_ENGINES).flat().filter(i => !disabledEnginesSet.has(i)).join(','),
   'enabled_plugins': ENABLED_PLUGINS.join(','),
   'image_proxy': 'True',
   'safesearch': 0,
@@ -100,4 +101,47 @@ if (!params.autocomplete) {
     autocomplete.style.display = 'none !important';
   }
 }
+
+const subscribeOnChanges = (node, selector, f) => {
+  const apply = (node, observer) => {
+    if (node?.nodeType !== 1) return;
+
+    let observeChildren = true;
+    if (node?.matches?.(selector)) {
+      try {
+        observeChildren = f(node, observer);
+      } catch (e) {
+        err(e, node);
+        if (e.name === 'SecurityError') {
+          observer.disconnect();
+          return;
+        }
+      }
+    }
+
+    if (observeChildren) {
+      const children = node?.childNodes || [];
+      children.forEach(i => apply(i, observer));
+    }
+  };
+
+  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
+  observer.observe(node, { childList: true, subtree: true });
+  apply(node, observer);
+};
+
+subscribeOnChanges(body, 'div#results div.engines span', (node, observer) => {
+  if (disabledEnginesSet.has(node.textContent)) {
+    console.log('unexpected engine');
+    observer.disconnect();
+    form?.submit();
+    return false;
+  }
+  return true;
+});
 })();
+
+const err = (e, node) => {
+  console.log(node);
+  console.error(e);
+};
