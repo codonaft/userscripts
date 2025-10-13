@@ -2,7 +2,7 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.10
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // ==/UserScript==
 
@@ -23,6 +23,8 @@ if (httpOk) {
 const queryFromInput = b.querySelector('input#q')?.value || '';
 hasResults = queryFromInput.length > 0 && (b.querySelector('td.response-time') || !b.querySelector('td.response-error')) && !b.querySelector('div.dialog-error-block')?.innerText.includes('No results were found');
 if (hasResults) return;
+
+// TODO: update statistics in localStorage?
 
 console.log('no SearXNG results');
 const url = new URL(loc.href);
@@ -69,5 +71,6 @@ if (postRequest) {
 
 const params = url.searchParams.toString();
 url.search = '';
-window.location.replace(`${url.toString()}#${params}`);
+url.hash = params;
+window.location.replace(url);
 })();

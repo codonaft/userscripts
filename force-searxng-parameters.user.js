@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.12
+// @version 0.13
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -32,7 +32,7 @@ const ENABLED_ENGINES = {
 };
 
 const DISALBED_ENGINES = {
-  'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini'],
+  'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini', 'wolframalpha'],
   'it': ['codeberg'],
 };
 
@@ -130,7 +130,7 @@ const subscribeOnChanges = (node, selector, f) => {
   apply(node, observer);
 };
 
-subscribeOnChanges(body, 'div#results div.engines span', (node, observer) => {
+subscribeOnChanges(b, 'div#results div.engines span', (node, observer) => {
   if (disabledEnginesSet.has(node.textContent)) {
     console.log('unexpected engine');
     observer.disconnect();
