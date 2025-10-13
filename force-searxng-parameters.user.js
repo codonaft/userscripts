@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.13
+// @version 0.14
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -13,7 +13,7 @@ const b = document.body;
 if (!b) return;
 if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 const loc = window.location;
-if (loc.pathname === '/preferences' || ['/info/', '/stats', '/about'].filter(i => loc.pathname.startsWith(i)).length > 0) return;
+if (loc.pathname === '/preferences' || ['/info/', '/stats', '/about'].find(i => loc.pathname.startsWith(i))) return;
 
 const CATEGORIES = ['general'];
 

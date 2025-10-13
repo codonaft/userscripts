@@ -1,30 +1,74 @@
 // ==UserScript==
 // @name Redirect SearXNG On Failure
-// @description Redirect to a random SearXNG instance in case of error and empty result
+// @description Redirect to a random SearXNG instance in case of error and empty result, improve instance selection with local statistics
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.11
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
+// @grant GM.getValue
+// @grant GM_setValue
 // ==/UserScript==
 
-(_ => {
+(async _ => {
 'use strict';
+
+const STATS_KEY = 'searxngRedirectorStats';
+const STATS_TTL_SECS = 24 * 60 * 60;
+
+const currentTime = _ => Math.round(Date.now() / 1000);
+const searxngRedirectorStats = await GM.getValue(STATS_KEY, {});
+if (document.head?.querySelector('title')?.textContent === 'Minimalist SearXNG Redirector') {
+  const newValue = Object.fromEntries(Object.entries(searxngRedirectorStats)
+    .filter(([_k, v]) => v.ttl > currentTime()));
+  console.log('sync SearXNG redirector stats', newValue);
+  const json = JSON.stringify(newValue);
+  if (localStorage.getItem(STATS_KEY) !== json) {
+    localStorage.setItem(STATS_KEY, json);
+  }
+}
 
 let hasResults = true;
 const httpOk = performance.getEntriesByType('navigation')[0]?.responseStatus === 200;
 const b = document.body;
 const loc = window.location;
 if (httpOk) {
-  if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
-  if (loc.pathname === '/preferences' || ['/info/', '/stats', '/about'].filter(i => loc.pathname.startsWith(i)).length > 0) return;
-} else {
-  hasResults = false;
+  if (!document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') && ![...b.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) {
+    console.log('NOT searxng');
+    return;
+  }
+  if (loc.pathname === '/preferences' || ['/info/', '/stats', '/about'].find(i => loc.pathname.startsWith(i))) {
+    console.log('ignoring by pathname');
+    return;
+  }
 }
 
-const queryFromInput = b.querySelector('input#q')?.value || '';
-hasResults = queryFromInput.length > 0 && (b.querySelector('td.response-time') || !b.querySelector('td.response-error')) && !b.querySelector('div.dialog-error-block')?.innerText.includes('No results were found');
-if (hasResults) return;
+const queryInput = b.querySelector('input#q[type="text"]');
+if (!queryInput) {
+  console.log('no query input found');
+  return;
+}
 
-// TODO: update statistics in localStorage?
+const queryFromInput = queryInput.value || '';
+hasResults = queryFromInput.length > 0 && (b.querySelector('td.response-time') || !b.querySelector('td.response-error')) && !b.querySelector('div.dialog-error-block')?.innerText.includes('No results were found');
+hasResults = !!hasResults;
+
+try {
+  if (!searxngRedirectorStats[loc.hostname]) {
+    searxngRedirectorStats[loc.hostname] = { ok: 0, failures: 0, ttl: 0 };
+  }
+  const stats = searxngRedirectorStats[loc.hostname];
+  stats.ok += +hasResults;
+  stats.failures += +!hasResults;
+  stats.ttl = currentTime() + STATS_TTL_SECS;
+  GM_setValue(STATS_KEY, searxngRedirectorStats);
+  console.log('update redirector stats', searxngRedirectorStats);
+} catch (e) {
+  console.error(e);
+}
+
+if (hasResults) {
+  console.log('there are SearXNG results');
+  return;
+}
 
 console.log('no SearXNG results');
 const url = new URL(loc.href);

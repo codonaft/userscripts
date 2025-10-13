@@ -115,7 +115,6 @@ const subscribeOnChanges = (node, selector, f) => {
       } catch (e) {
         err(e, node);
         if (e.name === 'SecurityError') {
-          console.log('disconnect observer');
           observer.disconnect();
           return;
         }
