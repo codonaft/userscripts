@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.41
+// @version 0.42
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -103,6 +103,16 @@ const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mou
   }
 };
 
+const updateUrl = (node, href) => {
+  node.href = href;
+  node.addEventListener('click', _ => {
+    if (!event.isTrusted) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    redirect(href, true);
+  }, true);
+};
+
 const subscribeOnChanges = (node, selector, f) => {
   const apply = (node, observer) => {
     if (node?.nodeType !== 1) return;
@@ -128,17 +138,23 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  apply(node, observer);
+  node.querySelectorAll(selector).forEach(i => apply(i, observer)); // TODO: apply to other scripts?
 };
 
-const init = args => {
-  const defaultVideoSelector = 'video';
+const defaultArgs = {
+  noKeysOverride: ['KeyF', 'Space'],
+  videoSelector: 'video',
+  nodeChangeSelector: 'a, div, input, li, span, video',
+};
+
+const init = (args = {}) => {
   const {
     css,
     noKeysOverride,
     searchInputSelector,
     searchFormOrSubmitButtonSelector,
     onSearch,
+    videoSelector,
     playSelector,
     pauseSelector,
     fullscreenSelector,
@@ -150,12 +166,9 @@ const init = args => {
     isUnwantedUrl,
     isVideoUrl,
     refreshOnPageChange,
+    nodeChangeSelector,
     onNodeChange,
-  } = args || {
-    noKeysOverride: ['KeyF', 'Space'],
-    videoSelector: defaultVideoSelector,
-  };
-  const videoSelector = args?.videoSelector || defaultVideoSelector;
+  } = { ...defaultArgs, ...args };
 
   try {
     const style = document.createElement('style');
@@ -189,7 +202,7 @@ const init = args => {
       button = findPlayButton(video);
       const strategies = [
         _ => button?.click(),
-        _ => simulateMouse(document, video), // TODO: second attempt?
+        _ => simulateMouse(document, video),
       ];
 
       let attempt = 0;
@@ -271,7 +284,7 @@ const init = args => {
   };
 
   let lastHref = window.location.href;
-  subscribeOnChanges(body, 'a, div, iframe, input, li, span, var, video', (node, _observer) => {
+  subscribeOnChanges(body, nodeChangeSelector, (node, _observer) => {
     const newHref = window.location.href;
     if (newHref !== lastHref) {
       console.log('new page', newHref);
@@ -497,7 +510,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         if (url.pathname === '/') return;
 
         url.searchParams.set('sort', 'top');
-        node.href = url;
+        updateUrl(node, url);
       },
     });
   },
@@ -574,7 +587,6 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     });
 
     const fatalFallback = _ => {
-      // TODO: open the same video in the new window and close the old one?
       console.log('fallback to embedded player');
       const container = body.querySelector('div.playerFlvContainer');
       const embedUrl = `${origin}/embed/${params.get('viewkey')}`;
@@ -605,11 +617,6 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         return;
       }
       body.classList.add(INITIALIZED)
-
-      if (body.querySelector('div.mgp_errorIcon') && body.querySelector('p')?.textContent.includes('Please refresh the page')) {
-        console.log('refreshing after error');
-        refresh();
-      }
 
       const video = body.querySelector('video');
       if (!video) {
@@ -663,7 +670,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     init({
       css: `
         #searchSuggestions a:focus { background-color: #111111 !important }
-        div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub, div.mgp_gridMenu { display: none !important }
+        div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub, div.mgp_gridMenu, ul#headerMainMenu li.photos { display: none !important }
       `,
       searchInputSelector: 'input#searchInput[type="text"], input[type="text"][name="search"]',
       onSearch: (query, form) => {
@@ -680,6 +687,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isUnwantedUrl: url => isUnwanted(url),
       isVideoUrl,
+      nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, var`,
       onNodeChange: node => {
         try {
           processPreview(node);
@@ -687,13 +695,8 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           err(e, node);
         }
 
-        if (node.matches('ul#headerMainMenu li.photos')) {
-          node.classList.add(HIDE);
-          return;
-        }
-
-        if (node.matches('div.mgp_source-unavailable-screen')) {
-          console.log('unavailable sources');
+        if (node.matches('div.mgp_source-unavailable-screen') || (node.matches('div.mgp_errorIcon') && body.querySelector('p')?.textContent?.includes('Please refresh the page'))) {
+          console.log('refreshing after error');
           refresh();
           return;
         }
@@ -726,7 +729,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           }
           params.set('o', p.startsWith('/model/') ? 'lg' : 'ra');
         }
-        setTimeout(_ => node.href = url.toString(), 500);
+        setTimeout(_ => updateUrl(node, url), 500);
       },
     });
 
@@ -739,7 +742,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     } else if (isVideoUrl(p)) {
       const durationFromNormalPlayer = timeToSeconds(body.querySelector('span.mgp_total')?.textContent);
       if (durationFromNormalPlayer) {
-        const lowQuality = ![...body.querySelectorAll('ul.mgp_quality li')].find(i => i.textContent.includes(MIN_VIDEO_HEIGHT));
+        const lowQuality = ![...body.querySelectorAll('ul.mgp_quality li')].find(i => i.textContent?.includes(MIN_VIDEO_HEIGHT));
         console.log('low quality', lowQuality);
         if (lowQuality || disliked(body)) {
           setUnwanted(url, Number.MAX_SAFE_INTEGER);
@@ -788,13 +791,13 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
         if (node.closest('div.sort')) return;
 
         if (href.includes('/search/')) {
-          node.href = `${href}/${ending}`;
+          updateUrl(node, `${href}/${ending}`);
         } else if (['categories', 'channels', 'models', 'tags'].find(i => href.includes(`/${i}/`))) {
-          node.href = `${href.replace('/hd/', '/')}hd/${ending}`;
+          updateUrl(node, `${href.replace('/hd/', '/')}hd/${ending}`);
         } else if (href === `${origin}/${topRated}/`) {
-          node.href = `${origin}/hd/${ending}`;
+          updateUrl(node, `${origin}/hd/${ending}`);
         } else if (['latest-updates', 'most-commented', 'most-favourited', 'most-popular'].find(i => [`${origin}/${i}/`, `${origin}/hd/${i}/`].includes(href))) {
-          node.href = `${origin.replace('/hd/', '/')}/hd${node.href.split(origin)[1]}${minDuration}/`;
+          updateUrl(node, `${origin.replace('/hd/', '/')}/hd${node.href.split(origin)[1]}${minDuration}/`);
         }
       },
     });
@@ -833,7 +836,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           }
           params.set('q', 'fhd');
           params.set('d', MIN_DURATION_MINS);
-          node.href = url.toString();
+          updateUrl(node, url);
         }
       },
     });
@@ -864,7 +867,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           url.pathname = `/search/${page}/`;
           params.set('type', 'hd');
           params.set('duration', '3');
-          node.href = url;
+          updateUrl(node, url);
         } else if (['/categories/', '/channel/', '/models/'].find(i => p.startsWith(i))) {
           const parts = p.split('/');
           const action = parts[1];
@@ -877,7 +880,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
             params.set('date', 'all');
             params.set('type', 'hd');
             params.set('duration', categories ? '3' : 'all');
-            node.href = url;
+            updateUrl(node, url);
           }
         }
       },
@@ -906,14 +909,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
             url.pathname += '/1/';
           }
           url.searchParams.set('sort', 'top-rated');
-          node.href = url;
-          node.addEventListener('click', _ => {
-            // TODO: use as a general solution for all updated links?
-            if (!event.isTrusted) return;
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            redirect(url, true);
-          }, true);
+          updateUrl(node, url);
         }
       },
     });
@@ -947,10 +943,10 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           if (params.get('length') !== 'full') {
             params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
             params.set('length', 'full');
-            node.href = url.toString();
+            updateUrl(node, url);
           }
         } else if (p === '/' || ['/categories/', '/channels/'].find(i => p.startsWith(i))) {
-          node.href = `${node.href.replace(/\/hd$/, '/')}/${best}/monthly?quality=${MIN_VIDEO_HEIGHT}p`;
+          updateUrl(node, `${node.href.replace(/\/hd$/, '/')}/${best}/monthly?quality=${MIN_VIDEO_HEIGHT}p`);
         }
       },
     });
@@ -986,7 +982,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           const query = parts.slice(hasPage ? -2 : -1)[0] || '';
           url.pathname = `${searchPath}/${query}/${page}`;
           url.search = '';
-          node.href = url.toString();
+          updateUrl(node, url);
         }
       },
     });
@@ -994,7 +990,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
 
   'xvideos.com': _ => {
     init({
-      css: 'a.premium, div.banner-slider, div.p-red, div.quickies-lat { display: none !important }',
+      css: 'a.premium, div.banner-slider, div.p-red, div.quickies-lat, div[style*="color: rgb(255, 255, 255)"][style*="text-align: center"], div.premium-results-line { display: none !important }',
       searchInputSelector: 'input.search-input[type="text"], input[type="text"][placeholder="Search X videos"]',
       onSearch: (query, form) => { // FIXME
         const url = new URL(form.action);
@@ -1014,8 +1010,9 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isUnwantedDuration: text => !text.includes('h') && parseFloat(text.split(' min')[0] || 0) < MIN_DURATION_MINS,
       isVideoUrl: href => new URL(href).pathname.startsWith('/video.'),
+      nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, strong`,
       onNodeChange: node => {
-        if (node.matches('div.error-dialog div.error-content button') && node.textContent.includes('Retry')) {
+        if (node.matches('div.error-dialog div.error-content button') && node.textContent?.includes('Retry')) {
           node.click();
           return;
         }
@@ -1029,17 +1026,17 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
           params.set('sort', 'rating');
           params.set('durf', `${MIN_DURATION_MINS}min_more`);
           params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
-          node.href = url.toString();
+          updateUrl(node, url);
           return;
         } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
           const ps = p.split('/');
           if (ps.length >= 3) {
             url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
-            node.href = url.toString();
+            updateUrl(node, url);
           }
         } else if (['channels', 'pornstars', 'profiles'].find(i => p.startsWith(`/${i}/`))) {
           url.hash = '_tabVideos';
-          node.href = url.toString();
+          updateUrl(node, url);
         }
       },
     });

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.user.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
@@ -33,7 +33,7 @@ const process = (node, observer) => {
       }
     }, randomPause());
     return false;
-  } else if (node.tagName === 'DIV' && node.textContent.includes('My Ad Center')) {
+  } else if (node.tagName === 'DIV' && node.textContent?.includes('My Ad Center')) {
     setTimeout(_ => {
       node.querySelectorAll('button').forEach(i => {
         if (i.getAttribute('aria-label')?.includes('Close')) {

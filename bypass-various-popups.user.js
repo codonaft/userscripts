@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.14
+// @version 0.15
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -28,12 +28,12 @@ const process = (node, observer) => {
     setTimeout(_ => {
       node.querySelectorAll('button[aria-label="close"]').forEach(i => i.click());
       node.querySelectorAll('button.btn').forEach(i => {
-        if (i.textContent.includes('Not now')) {
+        if (i.textContent?.includes('Not now')) {
           i.click();
         }
       });
       node.querySelectorAll('a').forEach(i => {
-        if (i.textContent.includes('Stay logged out')) {
+        if (i.textContent?.includes('Stay logged out')) {
           i.click();
         }
       });
@@ -42,13 +42,13 @@ const process = (node, observer) => {
     return false;
   }
 
-  if (node.matches('div.age-popup-btns > div#okButton') && node.textContent.includes('18 or older')) {
+  if (node.matches('div.age-popup-btns > div#okButton') && node.textContent?.includes('18 or older')) {
     observer.disconnect();
     node.click();
     return false;
   }
 
-  if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent.includes('Continue without disabling')) {
+  if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent?.includes('Continue without disabling')) {
     observer.disconnect();
     node.parentElement.click();
     return false;
@@ -59,7 +59,7 @@ const process = (node, observer) => {
     return false;
   }
 
-  if (node.tagName === 'BUTTON' && (node.getAttribute('data-role') === 'parental-control-confirm-button' || node.textContent.includes('Stay logged out'))) {
+  if (node.tagName === 'BUTTON' && (node.getAttribute('data-role') === 'parental-control-confirm-button' || node.textContent?.includes('Stay logged out'))) {
     setTimeout(_ => node.click(), randomPause(1000, 1500));
     return false;
   }
@@ -93,7 +93,7 @@ const process = (node, observer) => {
   if (node.matches('div.disclaimer_message')) {
     observer.disconnect();
     node.querySelectorAll('span').forEach(i => {
-      if (i.textContent.includes('I am 18 years')) {
+      if (i.textContent?.includes('I am 18 years')) {
         i?.closest('button')?.click();
       }
     });

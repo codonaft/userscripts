@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Remove Pseudocensorship
-// @version 0.8
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.user.js
 // ==/UserScript==
 
@@ -41,7 +41,7 @@ const err = (e, node) => {
 };
 
 subscribeOnChanges(document.body, 'p', (node, _observer) => {
-  if (node.textContent.includes('НАСТОЯЩИЙ МАТЕРИАЛ (ИНФОРМАЦИЯ)')) {
+  if (node.textContent?.includes('НАСТОЯЩИЙ МАТЕРИАЛ (ИНФОРМАЦИЯ)')) {
     node.style.display = 'none';
   }
   return true;

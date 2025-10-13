@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.14
+// @version 0.15
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -36,7 +36,7 @@ const cleanup = node => {
     const newHref = url.toString();
     if (newHref !== href) {
       node.href = newHref;
-      if (node.textContent.trim() === href) {
+      if (node.textContent?.trim() === href) {
         node.innerHTML = newHref;
       }
     }
