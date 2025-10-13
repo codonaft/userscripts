@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.38
+// @version 0.39
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -110,6 +110,11 @@ const subscribeOnChanges = (node, selector, f) => {
         observeChildren = f(node, observer);
       } catch (e) {
         err(e, node);
+        if (e.name === 'SecurityError') {
+          console.log('disconnect observer');
+          observer.disconnect();
+          return;
+        }
       }
     }
 
@@ -241,6 +246,7 @@ const init = args => {
 
     if (video.matches('video.jw-video')) {
       console.log('starting jwplayer');
+      // TODO: kt_player? etc.
       try {
         video.play();
         return;
@@ -468,7 +474,7 @@ const init = args => {
   });
 };
 
-// TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com, mat6tube.com, hypnotube.com
+// TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com, mat6tube.com, hypnotube.com, incestporno.vip, tube8.com, drtuber.com
 const shortDomain = window.location.hostname.replace(/^www\./, '');
 if (IGNORE_HOSTS.includes(shortDomain)) {
   console.log(shortDomain, 'is a part of ignore list');
@@ -921,6 +927,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'xhamster.com': _ => {
+    // TODO: <iframe src="https://xhamster.com/embed/xhHw7V9" scrolling="no" allowfullscreen="" width="640" height="480" frameborder="0"></iframe><p></p>
     const best = 'hd/full-length/best';
     init({
       css: 'div[data-block="moments"] { display: none !important }',

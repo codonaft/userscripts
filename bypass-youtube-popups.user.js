@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.4
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.user.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
@@ -58,6 +58,11 @@ const subscribeOnChanges = (node, selector, f) => {
         observeChildren = f(node, observer);
       } catch (e) {
         err(e, node);
+        if (e.name === 'SecurityError') {
+          console.log('disconnect observer');
+          observer.disconnect();
+          return;
+        }
       }
     }
 

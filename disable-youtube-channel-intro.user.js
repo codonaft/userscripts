@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.8
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -22,6 +22,11 @@ const subscribeOnChanges = (node, selector, f) => {
         observeChildren = f(node, observer);
       } catch (e) {
         err(e, node);
+        if (e.name === 'SecurityError') {
+          console.log('disconnect observer');
+          observer.disconnect();
+          return;
+        }
       }
     }
 

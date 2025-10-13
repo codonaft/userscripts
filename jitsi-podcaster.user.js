@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://external-content.duckduckgo.com/ip3/jitsi.org.ico
-// @version 0.10
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.user.js
 // ==/UserScript==
 
@@ -30,6 +30,11 @@ const subscribeOnChanges = (node, selector, f) => {
         observeChildren = f(node, observer);
       } catch (e) {
         err(e, node);
+        if (e.name === 'SecurityError') {
+          console.log('disconnect observer');
+          observer.disconnect();
+          return;
+        }
       }
     }
 

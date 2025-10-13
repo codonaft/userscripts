@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.13
+// @version 0.14
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -114,6 +114,11 @@ const subscribeOnChanges = (node, selector, f) => {
         observeChildren = f(node, observer);
       } catch (e) {
         err(e, node);
+        if (e.name === 'SecurityError') {
+          console.log('disconnect observer');
+          observer.disconnect();
+          return;
+        }
       }
     }
 
