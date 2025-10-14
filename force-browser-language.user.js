@@ -14,6 +14,6 @@ const url = new URL(window.location.href);
 if (!url.searchParams.has('hl') || first(url.searchParams.get('hl')) !== first(lang)) {
   window.stop();
   url.searchParams.set('hl', lang);
-  window.location.replace(url.toString());
+  window.location.replace(url);
 }
 })();

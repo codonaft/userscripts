@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.14
+// @version 0.15
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -132,9 +132,9 @@ const subscribeOnChanges = (node, selector, f) => {
 
 subscribeOnChanges(b, 'div#results div.engines span', (node, observer) => {
   if (disabledEnginesSet.has(node.textContent)) {
-    console.log('unexpected engine');
+    console.warn('unexpected engine, press the search button to retry');
     observer.disconnect();
-    form?.submit();
+    //form?.submit();
     return false;
   }
   return true;

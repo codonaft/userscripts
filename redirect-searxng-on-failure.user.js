@@ -2,7 +2,7 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result, improve instance selection with local statistics
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.12
+// @version 0.13
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // @grant GM.getValue
 // @grant GM_setValue
@@ -12,15 +12,13 @@
 'use strict';
 
 const STATS_KEY = 'searxngRedirectorStats';
-const STATS_TTL_SECS = 24 * 60 * 60;
+const STATS_TTL_SECS = 60 * 60;
 
 const currentTime = _ => Math.round(Date.now() / 1000);
-const searxngRedirectorStats = await GM.getValue(STATS_KEY, {});
+const searxngRedirectorStats = Object.fromEntries(Object.entries(await GM.getValue(STATS_KEY, {}))
+  .filter(([_k, v]) => v.ttl > currentTime()));
 if (document.head?.querySelector('title')?.textContent === 'Minimalist SearXNG Redirector') {
-  const newValue = Object.fromEntries(Object.entries(searxngRedirectorStats)
-    .filter(([_k, v]) => v.ttl > currentTime()));
-  console.log('sync SearXNG redirector stats', newValue);
-  const json = JSON.stringify(newValue);
+  const json = JSON.stringify(searxngRedirectorStats);
   if (localStorage.getItem(STATS_KEY) !== json) {
     localStorage.setItem(STATS_KEY, json);
   }
@@ -43,7 +41,7 @@ if (httpOk) {
 
 const queryInput = b.querySelector('input#q[type="text"]');
 if (!queryInput) {
-  console.log('no query input found');
+  console.warn('no query input found');
   return;
 }
 
@@ -60,7 +58,7 @@ try {
   stats.failures += +!hasResults;
   stats.ttl = currentTime() + STATS_TTL_SECS;
   GM_setValue(STATS_KEY, searxngRedirectorStats);
-  console.log('update redirector stats', searxngRedirectorStats);
+  console.log('update redirector stats', JSON.stringify(searxngRedirectorStats));
 } catch (e) {
   console.error(e);
 }
@@ -70,7 +68,7 @@ if (hasResults) {
   return;
 }
 
-console.log('no SearXNG results');
+console.warn('no SearXNG results');
 const url = new URL(loc.href);
 if (url.hostname.endsWith('.onion')) {
   url.host = 'codonaftbvv4j5k7nsrdivbdblycqrng5ls2qkng6lm77svepqjyxgid.onion';
@@ -94,7 +92,7 @@ if (postRequest) {
       .forEach(([k, v]) => url.searchParams.set(k, v));
   } else {
     if (queryFromInput.length === 0) {
-      console.log('no query found');
+      console.error('no query found');
       return;
     }
     url.searchParams.set('q', queryFromInput);
