@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.15
+// @version 0.16
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -20,7 +20,7 @@ const CATEGORIES = ['general'];
 // NOTE: overwritten by DISABLED_ENGINES
 const ENABLED_ENGINES = {
   'files': ['piratebay', 'solidtorrents', 'z-library'],
-  'general': ['duckduckgo', 'google', 'mozhi', 'openlibrary', 'wikipedia', 'wolframalpha'],
+  'general': ['brave', 'duckduckgo', 'google', 'mozhi', 'openlibrary', 'qwant', 'startpage', 'wikipedia', 'wolframalpha', 'yahoo'],
   'images': ['brave.images', 'duckduckgo images', 'google images', 'mojeek images', 'presearch images', 'qwant images', 'startpage images'],
   'it': ['askubuntu', 'bitbucket', 'codeberg', 'crates.io', 'docker hub', 'gitea.com', 'gitlab', 'habrahabr', 'hackernews', 'lib.rs', 'lobste.rs', 'sourcehut', 'stackoverflow', 'superuser'],
   'music': ['bandcamp', 'genius', 'mixcloud', 'radio browser', 'soundcloud', 'youtube'],
@@ -32,14 +32,18 @@ const ENABLED_ENGINES = {
 };
 
 const DISALBED_ENGINES = {
-  'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'sogou', 'tagesschau', 'wikimini', 'wolframalpha'],
+  'general': ['360search', 'baidu', 'bing', 'bpb', 'quark', 'mozhi', 'openlibrary', 'sogou', 'tagesschau', 'wikimini', 'wolframalpha'],
   'it': ['codeberg'],
 };
 
 const ENABLED_PLUGINS = ['calculator', 'oa_doi_rewrite', 'tracker_url_remover', 'Vim-like_hotkeys'];
 
+const METHOD = 'POST';
+
 const disabledEnginesFlat = Object.values(DISALBED_ENGINES).flat();
 const disabledEnginesSet = new Set(disabledEnginesFlat);
+
+const hashParams = new URLSearchParams(loc.href.split('#')[1] || '');
 
 // https://docs.searxng.org/dev/search_api.html
 const params = {
@@ -50,6 +54,7 @@ const params = {
   'enabled_plugins': ENABLED_PLUGINS.join(','),
   'image_proxy': 'True',
   'safesearch': 0,
+  ...Object.fromEntries(hashParams.entries()),
 };
 
 const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
@@ -72,16 +77,25 @@ const cookies = {
   'image_proxy': +(params.image_proxy === 'True'),
   'infinite_scroll': 1,
   'locale': 'en',
-  'method': 'POST',
+  'method': METHOD,
   'query_in_title': 0,
   'safesearch': params.safesearch || 0,
   'search_on_category_select': 1,
 };
 
 const form = b.querySelector('form#search');
-if (form) {
+const queryInput = b.querySelector('input#q[type="text"]');
+if (form && queryInput) {
   try {
+    const action = form.action.split('#')[0];
+    queryInput.addEventListener('input', _ => {
+      console.log('query', queryInput.value);
+      const newParams = new URLSearchParams({ ...params, q: queryInput.value });
+      form.action = `${action}#${newParams}`;
+    }, true);
+    form.method = METHOD;
     Object.entries(params).forEach(([k, v]) => {
+      if (k === 'q') return;
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = k;
@@ -102,7 +116,7 @@ if (!params.autocomplete) {
   }
 }
 
-const subscribeOnChanges = (node, selector, f) => {
+/*const subscribeOnChanges = (node, selector, f) => {
   const apply = (node, observer) => {
     if (node?.nodeType !== 1) return;
 
@@ -134,14 +148,14 @@ subscribeOnChanges(b, 'div#results div.engines span', (node, observer) => {
   if (disabledEnginesSet.has(node.textContent)) {
     console.warn('unexpected engine, press the search button to retry');
     observer.disconnect();
-    //form?.submit();
+    form?.submit();
     return false;
   }
   return true;
 });
-})();
 
 const err = (e, node) => {
   console.log(node);
   console.error(e);
-};
+};*/
+})();

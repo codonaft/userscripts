@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.43
+// @version 0.44
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -23,8 +23,10 @@ if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) retur
 
 // TODO: sync volume?
 
+const opensearch = document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title;
 const body = document.body;
-if (document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title?.toLowerCase().includes('searx') || [...body.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
+if (opensearch === 'metasearch') return;
+if (opensearch?.toLowerCase().includes('searx') || [...body.querySelectorAll('a[href="https://searx.space"]')].find(i => i.textContent?.includes('Public instances'))) return;
 
 const UNWANTED = '__unwanted';
 const HIDE = '__hide';
