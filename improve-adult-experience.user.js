@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.42
+// @version 0.43
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -33,10 +33,12 @@ const INITIALIZED = '__initialized';
 let unmuted = false;
 let pageIsHidden = true;
 
+const loc = window.location;
+
 let redirectHref;
 const redirect = (href, force) => {
   if (force) {
-    window.location.href = href;
+    loc.href = href;
     return;
   }
 
@@ -46,9 +48,9 @@ const redirect = (href, force) => {
     redirect(redirectHref, true);
   }
 };
-const refresh = force => redirect(window.location, force);
+const refresh = force => redirect(loc, force);
 
-const origin = window.location.origin;
+const origin = loc.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
 
 const err = (e, node) => {
@@ -61,19 +63,6 @@ const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 const pickRandom = xs => xs[random(0, xs.length - 1)];
 
 const timeToSeconds = time => (time || '').trim().split(':').map(parseFloat).reduceRight((total, value, index, parts) => total + value * 60 ** (parts.length - 1 - index), 0);
-
-const getTopNode = (document, node, x, y) => {
-  if (!node) return;
-  try {
-    const rect = node.getBoundingClientRect();
-    const clientX = rect.x + rect.width * x;
-    const clientY = rect.y + rect.height * y;
-    const target = document.elementFromPoint(clientX, clientY) || node;
-    return { target, clientX, clientY };
-  } catch (e) {
-    err(e, node);
-  }
-};
 
 const focus = (node, scrollTo) => {
   if (!node) return;
@@ -91,13 +80,25 @@ const focus = (node, scrollTo) => {
 
 const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) => {
   if (!node) return;
-  if (events.length === 0) return;
 
   console.log('simulateMouse', node, events);
   try {
     const { target, clientX, clientY } = getTopNode(document, node, 0.5, 0.5);
     console.log('simulateMouse target', target, clientX, clientY);
     events.forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true, cancelable: true })));
+  } catch (e) {
+    err(e, node);
+  }
+};
+
+const getTopNode = (document, node, x, y) => {
+  if (!node) return;
+  try {
+    const rect = node.getBoundingClientRect();
+    const clientX = rect.x + rect.width * x;
+    const clientY = rect.y + rect.height * y;
+    const target = document.elementFromPoint(clientX, clientY) || node;
+    return { target, clientX, clientY };
   } catch (e) {
     err(e, node);
   }
@@ -142,7 +143,6 @@ const subscribeOnChanges = (node, selector, f) => {
 };
 
 const defaultArgs = {
-  noKeysOverride: ['KeyF', 'Space'],
   videoSelector: 'video',
   nodeChangeSelector: 'a, div, input, li, span, video',
 };
@@ -283,9 +283,9 @@ const init = (args = {}) => {
     togglePlay(video);
   };
 
-  let lastHref = window.location.href;
+  let lastHref = loc.href;
   subscribeOnChanges(body, nodeChangeSelector, (node, _observer) => {
-    const newHref = window.location.href;
+    const newHref = loc.href;
     if (newHref !== lastHref) {
       console.log('new page', newHref);
       lastHref = newHref;
@@ -336,7 +336,7 @@ const init = (args = {}) => {
       return true;
     }
 
-    const url = window.location;
+    const url = loc;
     const videoPage = url.pathname !== '/' && (!isVideoUrl || isVideoUrl(url.href));
 
     try {
@@ -484,12 +484,13 @@ const init = (args = {}) => {
 };
 
 // TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com, mat6tube.com, hypnotube.com, incestporno.vip, tube8.com, drtuber.com
-const shortDomain = window.location.hostname.replace(/^www\./, '');
+const shortDomain = loc.hostname.split('.').slice(-2).join('.');
 if (IGNORE_HOSTS.includes(shortDomain)) {
   console.log(shortDomain, 'is a part of ignore list');
   return;
 }
 
+const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 ({
   'anysex.com': _ => {
     const isVideoUrl = href => href.includes('/video/');
@@ -547,7 +548,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
     const videoSelector = 'video.mgp_videoElement:not(.gifVideo)';
     const durationSelector = 'var.duration, span.duration';
 
-    const url = new URL(window.location.href);
+    const url = new URL(loc.href);
     const params = url.searchParams;
     const p = url.pathname;
 
@@ -1041,5 +1042,5 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
       },
     });
   },
-}[shortDomain] || init)();
+}[shortDomain] || defaultInit)();
 })();

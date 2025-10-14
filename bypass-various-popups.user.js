@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.15
+// @version 0.16
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -9,7 +9,7 @@
 // @match https://hqporner.com/*
 // @match https://pmvhaven.com/*
 // @match https://www.cvedetails.com/*
-// @match https://www.pornhub.com/*
+// @match https://*.pornhub.com/*
 // @match https://www.porntrex.com/*
 // @match https://www.xnxx.com/*
 // @match https://www.xvideos.com/*
@@ -22,6 +22,32 @@
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
 const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+
+const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) => {
+  if (!node) return;
+
+  console.log('simulateMouse', node, events);
+  try {
+    const { target, clientX, clientY } = getTopNode(document, node, 0.5, 0.5);
+    console.log('simulateMouse target', target, clientX, clientY);
+    events.forEach(i => target.dispatchEvent(new MouseEvent(i, { clientX, clientY, bubbles: true, cancelable: true })));
+  } catch (e) {
+    err(e, node);
+  }
+};
+
+const getTopNode = (document, node, x, y) => {
+  if (!node) return;
+  try {
+    const rect = node.getBoundingClientRect();
+    const clientX = rect.x + rect.width * x;
+    const clientY = rect.y + rect.height * y;
+    const target = document.elementFromPoint(clientX, clientY) || node;
+    return { target, clientX, clientY };
+  } catch (e) {
+    err(e, node);
+  }
+};
 
 const process = (node, observer) => {
   if (node.matches('div[role=dialog]')) {
@@ -81,12 +107,10 @@ const process = (node, observer) => {
     return false;
   }
 
-  if (node.matches('#modalWrapMTubes')) {
+  if (node.matches('#modalWrapMTubes button[data-label="over18_enter"]')) {
+    console.log('detected', node);
     observer.disconnect();
-    setTimeout(
-      _ => node.querySelectorAll('div > div > button').forEach(i => i.click()),
-      randomPause(100, 400)
-    );
+    simulateMouse(document, node);
     return false;
   }
 
@@ -129,7 +153,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  apply(node, observer);
+  node.querySelectorAll(selector).forEach(i => apply(i, observer)); // TODO: apply to other scripts?
 };
 
 const err = (e, node) => {
