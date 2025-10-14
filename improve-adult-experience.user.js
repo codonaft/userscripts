@@ -990,7 +990,7 @@ if (IGNORE_HOSTS.includes(shortDomain)) {
 
   'xvideos.com': _ => {
     init({
-      css: 'a.premium, div.banner-slider, div.p-red, div.quickies-lat, div[style*="color: rgb(255, 255, 255)"][style*="text-align: center"], div.premium-results-line { display: none !important }',
+      css: 'a.premium, button.comments span.badge, div[style*="color: rgb(255, 255, 255)"][style*="text-align: center"], div.banner-slider, div.p-red, div.quickies-lat, div.premium-results-line, ul.search-premium-tabs { display: none !important }',
       searchInputSelector: 'input.search-input[type="text"], input[type="text"][placeholder="Search X videos"]',
       onSearch: (query, form) => { // FIXME
         const url = new URL(form.action);
