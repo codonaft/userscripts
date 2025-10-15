@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
 // ==/UserScript==
 
@@ -10,27 +10,16 @@
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 if (document.head?.querySelector('link[type="application/opensearchdescription+xml"]')?.title !== 'metasearch') return;
 
-const DISABLE_AUTOCOMPLETE = true;
 const REDIRECT_ON_FAILURE = true;
 const FIX_IMAGES = true;
 
 const body = document.body;
 const params = new URLSearchParams(window.location.search);
+if (!body) return;
+
 const q = params.get('q');
-if (!body || !q) return;
-
-if (DISABLE_AUTOCOMPLETE) {
-  const input = body.querySelector('input#search-input');
-  ['click', 'input'].forEach(i => {
-    input?.addEventListener(i, event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }, true);
-  });
-}
-
 const images = body.querySelectorAll('div.image-result');
-if (REDIRECT_ON_FAILURE && !body.querySelector('div.search-result') && images.length === 0) {
+if (REDIRECT_ON_FAILURE && q && images.length === 0 && !body.querySelector('div.search-result')) {
   const categories = params.get('tab') === 'images' ? 'images' : 'general';
   const newParams = new URLSearchParams({ q, categories });
   window.location.replace(`https://codonaft.com/searxng#${params}`);
@@ -53,7 +42,7 @@ if (FIX_IMAGES) {
     if (!proxyHref) return;
     link.href = proxyHref;
     if (image.complete && image.naturalWidth === 0) {
-      link.classList.add(HIDE);
+      link.closest('div.image-result')?.classList.add(HIDE);
     }
   });
 }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.16
+// @version 0.17
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -54,7 +54,7 @@ const params = {
   'enabled_plugins': ENABLED_PLUGINS.join(','),
   'image_proxy': 'True',
   'safesearch': 0,
-  ...Object.fromEntries(hashParams.entries()),
+  ...Object.fromEntries(Array.from(hashParams.entries())), // NOTE: fails on Firefox without Array.from
 };
 
 const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
@@ -87,13 +87,26 @@ const form = b.querySelector('form#search');
 const queryInput = b.querySelector('input#q[type="text"]');
 if (form && queryInput) {
   try {
+    form.method = METHOD;
+
     const action = form.action.split('#')[0];
     queryInput.addEventListener('input', _ => {
       console.log('query', queryInput.value);
       const newParams = new URLSearchParams({ ...params, q: queryInput.value });
       form.action = `${action}#${newParams}`;
+      if (!params.autocomplete) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
     }, true);
-    form.method = METHOD;
+
+    if (!params.autocomplete) {
+      ['click', 'mousedown', 'keyup', 'Tab', 'Enter'].forEach(i => queryInput.addEventListener(i, event => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }));
+    }
+
     Object.entries(params).forEach(([k, v]) => {
       if (k === 'q') return;
       const input = document.createElement('input');
@@ -108,13 +121,6 @@ if (form && queryInput) {
 }
 
 Object.entries(cookies).forEach(([k, v]) => document.cookie = `${k}=${v}`);
-
-if (!params.autocomplete) {
-  const autocomplete = b.querySelector('div.autocomplete');
-  if (autocomplete) {
-    autocomplete.style.display = 'none !important';
-  }
-}
 
 /*const subscribeOnChanges = (node, selector, f) => {
   const apply = (node, observer) => {
