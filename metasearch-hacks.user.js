@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
 // ==/UserScript==
 
@@ -22,7 +22,7 @@ const images = body.querySelectorAll('div.image-result');
 if (REDIRECT_ON_FAILURE && q && images.length === 0 && !body.querySelector('div.search-result')) {
   const categories = params.get('tab') === 'images' ? 'images' : 'general';
   const newParams = new URLSearchParams({ q, categories });
-  window.location.replace(`https://codonaft.com/searxng#${params}`);
+  window.location.replace(`https://codonaft.com/searxng#${newParams}`);
 }
 
 if (FIX_IMAGES) {
