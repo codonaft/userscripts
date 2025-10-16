@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.17
+// @version 0.18
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // ==/UserScript==
 
@@ -100,13 +100,6 @@ if (form && queryInput) {
       }
     }, true);
 
-    if (!params.autocomplete) {
-      ['click', 'mousedown', 'keyup', 'Tab', 'Enter'].forEach(i => queryInput.addEventListener(i, event => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-      }));
-    }
-
     Object.entries(params).forEach(([k, v]) => {
       if (k === 'q') return;
       const input = document.createElement('input');
@@ -121,6 +114,13 @@ if (form && queryInput) {
 }
 
 Object.entries(cookies).forEach(([k, v]) => document.cookie = `${k}=${v}`);
+
+if (!params.autocomplete) {
+  const autocomplete = b.querySelector('div.autocomplete');
+  if (autocomplete) {
+    autocomplete.style.display = 'none !important';
+  }
+}
 
 /*const subscribeOnChanges = (node, selector, f) => {
   const apply = (node, observer) => {
