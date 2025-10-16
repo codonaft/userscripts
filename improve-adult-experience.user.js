@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.44
+// @version 0.45
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -498,7 +498,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const isVideoUrl = href => href.includes('/video/');
     init({
       searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${query}`), // FIXME
+      onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${encodeURIComponent(query)}`), // FIXME
       fullscreenSelector: 'div#main_video_fluid_control_fullscreen',
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.item-quality',
