@@ -83,7 +83,7 @@ if (FIX_IMAGES) {
       event.stopImmediatePropagation();
 
       largeImage?.classList?.remove(LARGE);
-      if (largeImage == image) {
+      if (largeImage === image) {
         largeImage = undefined;
         if (typeof scrollX === 'number') {
           window.scrollTo(scrollX, scrollY);
