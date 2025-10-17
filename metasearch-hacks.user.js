@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
 // ==/UserScript==
 
@@ -12,18 +12,22 @@ if (document.head?.querySelector('link[type="application/opensearchdescription+x
 
 const FIX_IMAGES = true;
 const REDIRECT_ON_FAILURE = true;
-const SHOW_LOG_ON_SEARCH_HOVER = true;
+const SEARXNG_BUTTON = true;
 
 const body = document.body;
 const params = new URLSearchParams(window.location.search);
 if (!body) return;
 
-const q = params.get('q');
-const imageResults = body.querySelectorAll('div.image-result');
-if (REDIRECT_ON_FAILURE && q && imageResults.length === 0 && !body.querySelector('div.search-result')) {
+const redirectToSearxng = q => {
   const categories = params.get('tab') === 'images' ? 'images' : 'general';
   const newParams = new URLSearchParams({ q, categories });
   window.location.replace(`https://codonaft.com/searxng#${newParams}`);
+};
+
+const q = params.get('q');
+const imageResults = body.querySelectorAll('div.image-result');
+if (REDIRECT_ON_FAILURE && q && imageResults.length === 0 && !body.querySelector('div.search-result')) {
+  redirectToSearxng(q);
 }
 
 const DARK = '__dark';
@@ -44,11 +48,19 @@ try {
   `;
   body.appendChild(style);
 
-  if (SHOW_LOG_ON_SEARCH_HOVER) {
-    const searchButton = body.querySelector('input[type="submit"][value="Search"]');
+  if (SEARXNG_BUTTON) {
+    const redirectButton = document.createElement('input');
+    redirectButton.type = 'submit';
+    redirectButton.value = 'SearXNG';
+    body.querySelector('form.search-form')?.appendChild(redirectButton);
+
     const progressUpdates = body.querySelector('div.progress-updates');
-    searchButton?.addEventListener('mouseenter', _ => progressUpdates?.classList.add(DARK));
-    searchButton?.addEventListener('mouseleave', _ => progressUpdates?.classList.remove(DARK));
+    redirectButton?.addEventListener('mouseenter', _ => progressUpdates?.classList.add(DARK));
+    redirectButton?.addEventListener('mouseleave', _ => progressUpdates?.classList.remove(DARK));
+    redirectButton?.addEventListener('click', event => {
+      event.preventDefault();
+      redirectToSearxng(body.querySelector('input#search-input')?.value || q);
+    }, true);
   }
 } catch (e) {
   console.error(e);
