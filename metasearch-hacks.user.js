@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
 // ==/UserScript==
 
@@ -27,22 +27,51 @@ if (REDIRECT_ON_FAILURE && q && imageResults.length === 0 && !body.querySelector
 
 if (FIX_IMAGES) {
   const HIDE = '__hide';
+  const LARGE = '__large';
   try {
     const style = document.createElement('style');
-    style.innerHTML = `.${HIDE} { display: none !important }`;
+    style.innerHTML = `
+      .${HIDE} { display: none !important }
+      .${LARGE} {
+        height: 30rem !important;
+        object-fit: contain !important;
+      }
+    `;
     body.appendChild(style);
   } catch (e) {
     console.error(e);
   }
 
+  let scrollX;
+  let scrollY;
+  let largeImage;
   imageResults.forEach(i => {
     const link = i.querySelector('a.image-result-anchor');
     const image = link?.querySelector('div.image-result-img-container img');
     image?.addEventListener('error', _ => i.closest('div.image-result')?.classList.add(HIDE));
 
     const proxyHref = image?.src;
-    if (!proxyHref) return;
+    if (!proxyHref || !image) return;
     link.href = proxyHref;
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      largeImage?.classList?.remove(LARGE);
+      if (largeImage == image) {
+        largeImage = undefined;
+        if (typeof scrollX === 'number') {
+          window.scrollTo(scrollX, scrollY);
+        }
+      } else {
+        scrollX = window.scrollX;
+        scrollY = window.scrollY;
+        image.classList?.add(LARGE);
+        link.scrollIntoView();
+        largeImage = image;
+      }
+    }, true);
+
     if (image.complete && image.naturalWidth === 0) {
       link.closest('div.image-result')?.classList.add(HIDE);
     }
