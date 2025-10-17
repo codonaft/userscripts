@@ -18,8 +18,8 @@ const params = new URLSearchParams(window.location.search);
 if (!body) return;
 
 const q = params.get('q');
-const images = body.querySelectorAll('div.image-result');
-if (REDIRECT_ON_FAILURE && q && images.length === 0 && !body.querySelector('div.search-result')) {
+const imageResults = body.querySelectorAll('div.image-result');
+if (REDIRECT_ON_FAILURE && q && imageResults.length === 0 && !body.querySelector('div.search-result')) {
   const categories = params.get('tab') === 'images' ? 'images' : 'general';
   const newParams = new URLSearchParams({ q, categories });
   window.location.replace(`https://codonaft.com/searxng#${newParams}`);
@@ -35,9 +35,11 @@ if (FIX_IMAGES) {
     console.error(e);
   }
 
-  images.forEach(i => {
+  imageResults.forEach(i => {
     const link = i.querySelector('a.image-result-anchor');
     const image = link?.querySelector('div.image-result-img-container img');
+    image?.addEventListener('error', _ => i.closest('div.image-result')?.classList.add(HIDE));
+
     const proxyHref = image?.src;
     if (!proxyHref) return;
     link.href = proxyHref;
