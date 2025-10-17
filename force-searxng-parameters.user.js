@@ -147,7 +147,7 @@ if (!params.autocomplete) {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  apply(node, observer);
+  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 subscribeOnChanges(b, 'div#results div.engines span', (node, observer) => {

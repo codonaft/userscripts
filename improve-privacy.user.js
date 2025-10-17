@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.16
+// @version 0.17
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -71,7 +71,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  apply(node, observer);
+  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {

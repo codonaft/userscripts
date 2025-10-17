@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.45
+// @version 0.46
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // ==/UserScript==
 
@@ -141,7 +141,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer)); // TODO: apply to other scripts?
+  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 const defaultArgs = {

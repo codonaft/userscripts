@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.16
+// @version 0.17
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
 // @match https://chat.deepseek.com/*
@@ -153,7 +153,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer)); // TODO: apply to other scripts?
+  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 const err = (e, node) => {

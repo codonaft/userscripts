@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Remove Pseudocensorship
-// @version 0.9
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/remove-pseudocensorship.user.js
 // ==/UserScript==
 
@@ -32,7 +32,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  apply(node, observer);
+  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 const err = (e, node) => {

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.9
+// @version 0.10
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -37,7 +37,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
   const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
   observer.observe(node, { childList: true, subtree: true });
-  apply(node, observer);
+  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 subscribeOnChanges(document.body, 'button.ytp-play-button[data-title-no-tooltip="Pause"]', (node, observer) => {
