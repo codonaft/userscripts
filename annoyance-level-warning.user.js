@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name Cross off the links with CAPTCHA/PoW annoyance
+// @name Label the links with CAPTCHA/PoW annoyance
 // @description Helps to prefer visiting sites that aren't associated with the irrational businesses that keep "fighting" the spammy traffic by disrupting the UX with cringe challenges (rather than transforming the traffic into useful (UPoW) and profitable computations) as well as sites with PoW-based DDoS-protection pages (useless anti-ecological computations).
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/annoyance-level-warning.user.js
 // @grant GM.getValue
 // @grant GM.xmlHttpRequest
@@ -36,22 +36,21 @@ GM_addStyle(`
   position: relative;
 }
 .${RECORD_KEY}::after {
-  font-size: 2rem;
+  font-size: 0.8rem;
   content: "🤖";
   position: absolute;
   top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1;
-  opacity: 0.3;
+  left: 20%;
+  transform: translate(-80%, -50%);
+  z-index: -1;
 }
 .${RECORD_KEY}:hover {
   opacity: 1 !important;
   text-decoration: none !important;
 }
 .${RECORD_KEY}:hover::after {
-  content: "";
-  opacity: 0.1;
+  opacity: 0.3 !important;
+  z-index: 1;
 }
 .${RECORD_KEY}_${LEVEL_POW} {
   opacity: 0.7 !important;
@@ -242,7 +241,7 @@ subscribeOnChanges(b, 'p[class="h2"]', (node, observer) => {
   return true;
 });
 
-subscribeOnChanges(b, 'div.amzn-captcha-modal, div#captcha-container', (node, observer) => {
+subscribeOnChanges(b, 'div.amzn-captcha-modal, div#captcha-container', (_node, observer) => {
   if (document.querySelector(AWS_SCRIPT)) {
     observer.disconnect();
     console.warn('captcha started');
