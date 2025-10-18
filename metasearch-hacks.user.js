@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
+// @grant GM_addStyle
 // ==/UserScript==
 
 (_ => {
@@ -33,37 +34,31 @@ if (REDIRECT_ON_FAILURE && q && imageResults.length === 0 && !body.querySelector
 const DARK = '__dark';
 const HIDE = '__hide';
 const LARGE = '__large';
-try {
-  const style = document.createElement('style');
-  style.innerHTML = `
-    .${DARK} {
-      display: block !important;
-      opacity: 0.18;
-    }
-    .${HIDE} { display: none !important }
-    .${LARGE} {
-      height: 30rem !important;
-      object-fit: contain !important;
-    }
-  `;
-  body.appendChild(style);
-
-  if (SEARXNG_BUTTON) {
-    const redirectButton = document.createElement('input');
-    redirectButton.type = 'submit';
-    redirectButton.value = 'SearXNG';
-    body.querySelector('form.search-form')?.appendChild(redirectButton);
-
-    const progressUpdates = body.querySelector('div.progress-updates');
-    redirectButton?.addEventListener('mouseenter', _ => progressUpdates?.classList.add(DARK));
-    redirectButton?.addEventListener('mouseleave', _ => progressUpdates?.classList.remove(DARK));
-    redirectButton?.addEventListener('click', event => {
-      event.preventDefault();
-      redirectToSearxng(body.querySelector('input#search-input')?.value || q);
-    }, true);
+GM_addStyle(`
+  .${DARK} {
+    display: block !important;
+    opacity: 0.18;
   }
-} catch (e) {
-  console.error(e);
+  .${HIDE} { display: none !important }
+  .${LARGE} {
+    height: 30rem !important;
+    object-fit: contain !important;
+  }
+`);
+
+if (SEARXNG_BUTTON) {
+  const redirectButton = document.createElement('input');
+  redirectButton.type = 'submit';
+  redirectButton.value = 'SearXNG';
+  body.querySelector('form.search-form')?.appendChild(redirectButton);
+
+  const progressUpdates = body.querySelector('div.progress-updates');
+  redirectButton?.addEventListener('mouseenter', _ => progressUpdates?.classList.add(DARK));
+  redirectButton?.addEventListener('mouseleave', _ => progressUpdates?.classList.remove(DARK));
+  redirectButton?.addEventListener('click', event => {
+    event.preventDefault();
+    redirectToSearxng(body.querySelector('input#search-input')?.value || q);
+  }, true);
 }
 
 if (FIX_IMAGES) {
