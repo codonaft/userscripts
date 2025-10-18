@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Label the links with CAPTCHA/PoW annoyance
 // @description Helps to prefer visiting sites that aren't associated with the irrational businesses that keep "fighting" the spammy traffic by disrupting the UX with cringe challenges (rather than transforming the traffic into useful (UPoW) and profitable computations) as well as sites with PoW-based DDoS-protection pages (useless anti-ecological computations).
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/annoyance-level-warning.user.js
 // @grant GM.getValue
 // @grant GM.xmlHttpRequest
@@ -14,8 +14,8 @@
 
 const RECHECK_DURATION_SECS = 7 * 24 * 60 * 60;
 const QUEUE_LIMIT = 128;
-const RECORD_KEY = '__annoyance_level_warning';
-const IP_TO_COMPANY_KEY = `${RECORD_KEY}_ip_to_company`;
+const RECORD_KEY = 'annoyanceLevelWarning';
+const IP_TO_COMPANY_KEY = `${RECORD_KEY}IpToCompany`;
 
 // https://github.com/curl/curl/wiki/DNS-over-HTTPS#publicly-available-servers
 const DOH_HOSTS = ['3dns.eu/dns-query', 'arashi.net.eu.org/dns-query', 'dns.belnet.be/dns-query', 'dns.blokada.org/dns-query', 'dns.csswg.org/dns-query', 'dns.dnsguard.pub/dns-query', 'dns.dnsguard.pub/dns-query', 'dns.elemental.software/dns-query', 'dns.girino.org/dns-query', 'dns.glf.wtf/dns-query', 'dns.mzjtechnology.com/dns-query', 'dns.nextdns.io/resolve', 'dns.novg.net/dns-query', 'dns.startupstack.tech/dns-query', 'dns.stirringphoto.com/dns-query', 'dns.svoi.dev/dns-query', 'dns.tls-data.de/dns-query', 'dns.w3ctag.org/dns-query', 'dns4eu.online/dns-query', 'doh.li/dns-query', 'doh.seby.io/dns-query', 'dukun.de/dns-query', 'masters-of-cloud.de/dns-query', 'ns.net.kg/dns-query'];
@@ -113,7 +113,7 @@ const setWarning = (node, level) => {
   node.title = node.title?.length > 0 ? `(${warning}) ${node.title}` : warning; // TODO: css?
 };
 
-const resolveCompany = async ip => {
+const resolveCompany = async (ip, hostname) => {
   const cachedCompany = ipToCompany[ip];
   if (cachedCompany) {
     return cachedCompany;
@@ -160,7 +160,7 @@ const check = async hostname => {
       throw `dns resolve failure: hostname=${hostname}, resolver=${dohHost}, response=${JSON.stringify(dnsResponse)}`;
     }
 
-    const company = await resolveCompany(ip);
+    const company = await resolveCompany(ip, hostname);
     if (company === 'Cloudflare, Inc.') {
       // TODO: other proxy companies?
       if (record.level < LEVEL_TO_NUMBER[LEVEL_MAYBE_CAPTCHA]) {
