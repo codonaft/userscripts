@@ -160,6 +160,7 @@ const check = async hostname => {
       throw `dns resolve failure: hostname=${hostname}, resolver=${dohHost}, response=${JSON.stringify(dnsResponse)}`;
     }
 
+    // TODO: match IP by cidr?
     const company = await resolveCompany(ip, hostname);
     if (company === 'Cloudflare, Inc.') {
       // TODO: other proxy companies?

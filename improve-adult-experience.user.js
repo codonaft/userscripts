@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: pornhub.com, xvideos.com, anysex.com, spankbang.com, porntrex.com, txxx.com, xnxx.com, xhamster.com, vxxx.com
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, drtuber.com, incestporno.vip, pornhub.com, porntrex.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, vxxx.com, xhamster.com, xnxx.com, xvideos.com, whoreshub.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.48
+// @version 0.49
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -11,7 +11,6 @@
 'use strict';
 
 const IGNORE_HOSTS = []; // NOTE: without 'www.', e.g. 'xvideos.com'
-const MINOR_IMPROVEMENTS = true; // NOTE: try to turn this off in case if some UI appears to be broken
 
 const AUTOPLAY = true;
 const HIDE_EXTERNAL_LINKS = true;
@@ -146,6 +145,7 @@ const subscribeOnChanges = (node, selector, f) => {
 };
 
 const defaultArgs = {
+  css: '',
   videoSelector: 'video',
   nodeChangeSelector: 'a, div, input, li, span, video',
 };
@@ -177,7 +177,7 @@ const init = (args = {}) => {
     .${HIDE} { display: none !important }
     .${UNWANTED} { opacity: 10% !important }
     .${UNWANTED}:hover { opacity: 40% !important }
-    ${MINOR_IMPROVEMENTS && css ? css : ''}
+    ${css}
   `);
 
   let searchInputInitialized = false;
@@ -295,7 +295,7 @@ const init = (args = {}) => {
       }
     }
 
-    if (MINOR_IMPROVEMENTS && HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
+    if (HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node)) {
       node.classList.add(HIDE);
       return false;
     }
@@ -305,7 +305,7 @@ const init = (args = {}) => {
       docs.push(document);
     }
 
-    if (MINOR_IMPROVEMENTS && !searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
+    if (!searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
       console.log('initializing search input');
       searchInputInitialized = true;
       const searchInput = node.matches(searchInputSelector) ? node : body.querySelector(searchInputSelector);
@@ -452,18 +452,16 @@ const init = (args = {}) => {
       if (event.ctrlKey || event.altKey || event.metaKey || d.activeElement.tagName === 'INPUT') return;
 
       console.log('keydown', event.code);
-      if (MINOR_IMPROVEMENTS) {
-        if (['Space', 'KeyP'].includes(event.code)) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          togglePlay(video);
-        } else if (fullscreenSelector && event.code === 'KeyF') {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          toggleFullscreen(video);
-        } else {
-          focus(video);
-        }
+      if (['Space', 'KeyP'].includes(event.code)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        togglePlay(video);
+      } else if (fullscreenSelector && event.code === 'KeyF') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        toggleFullscreen(video);
+      } else {
+        focus(video);
       }
     }, true); });
 
@@ -473,14 +471,14 @@ const init = (args = {}) => {
       maybeStartAutoplay(video);
     } else {
       console.log('load');
-      video.load();
+      video.load?.();
     }
 
     return true;
   });
 };
 
-// TODO: consider redtube.com, tnaflix.com, hdzog.tube, pornxp.com, рус-порно.tv, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, taboodude.com, mat6tube.com, hypnotube.com, incestporno.vip, tube8.com, drtuber.com
+// TODO: consider hdzog.tube, pornxp.com, xgroovy.com, pmvhaven.com, pornhits.com, manysex.com, inporn.com, hqporner.com, bingato.com, mat6tube.com, hypnotube.com, xxxbp.tv, veporn.com
 const shortDomain = loc.hostname.split('.').slice(-2).join('.');
 if (IGNORE_HOSTS.includes(shortDomain)) {
   console.log(shortDomain, 'is a part of ignore list');
@@ -536,6 +534,53 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       refreshOnPageChange: true,
       onNodeChange: _node => {
         // TODO
+      },
+    });
+  },
+
+  'drtuber.com': _ => {
+    const thumbnailSelector = 'a.wrap-better-content';
+    init({
+      css: 'div.posting_view { display: none !important }',
+      playSelector: 'a.drt-button-play[title="Play"]',
+      fullscreenSelector: 'div.drt-button-fullscreen, div.drt-control-item[title="Fullscreen"]',
+      thumbnailSelector,
+      durationSelector: 'em.time_thumb',
+      isUnwantedDuration: text => {
+        const time = text.split(' ')[2];
+        return !time?.includes(':') || timeToSeconds(time) < MIN_DURATION_MINS * 60;
+      },
+      isVideoUrl: href => href.includes('/video/'),
+      nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, em`,
+      onNodeChange: node => {
+        if (!validLink(node)) return;
+
+        if (node.matches(thumbnailSelector) && !node.querySelector('i.quality')) {
+          node.classList.add(UNWANTED);
+          return;
+        }
+
+        const url = new URL(node.href);
+        const p = url.pathname;
+        if (p.startsWith('/linkout/')) {
+          node.classList.add(HIDE);
+        } else if (p.startsWith('/categories/') && !['hd', '4k'].find(i => p.endsWith(i))) {
+          node.href += '/4k';
+        }
+      },
+    });
+  },
+
+  'incestporno.vip': _ => {
+    init({
+      css: 'p.megatext { display: none !important }',
+      playSelector: 'div.fp-player',
+      thumbnailSelector: 'div.preview',
+      durationSelector: 'div.meta-dur-date > ul > li',
+      isUnwantedDuration: text => text.includes(':') && timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => {
+        const p = new URL(href).pathname;
+        return !['/cat-', '/categories/', '/latest-updates/', '/most-popular/', '/top-rated/', '/search/'].find(i => p.startsWith(i));
       },
     });
   },
@@ -770,7 +815,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
       searchFormOrSubmitButtonSelector: 'form#search_form button[type="submit"][aria-label="search"], button[type="submit"][aria-label="search"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/${query}/${ending}`), // FIXME
+      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/${ending}`), // FIXME
       playSelector: 'a.fp-play',
       fullscreenSelector: 'a.fp-screen',
       thumbnailSelector: 'div.thumb-item, span.video-item',
@@ -804,12 +849,42 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     });
   },
 
+  'redtube.com': _ => {
+    init({
+      thumbnailSelector: 'div.video_block_wrapper',
+      videoSelector: 'video.mgp_videoElement:not(.gifVideo)',
+      playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
+      fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
+      durationSelector: 'div.duration',
+      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => parseFloat(new URL(href).pathname.split('/')[1]) || false,
+      onNodeChange: node => {
+        if (!validLink(node) || node.closest('div.videos_sorting_container')) return;
+
+        const url = new URL(node.href);
+        const params = url.searchParams;
+        const p = url.pathname;
+        if ((p === '/' || p.startsWith('/redtube/') || params.has('search')) && (!params.has('min_duration') || !params.has('hd'))) {
+          params.set('min_duration', MIN_DURATION_MINS);
+          params.set('hd', '1');
+          node.href = url;
+        } else if (['channels', 'pornstar'].find(i => p.startsWith(`/${i}/`)) && !p.endsWith('/longest')) {
+          url.pathname += '/longest';
+          node.href = url;
+        } else if (p.startsWith('/amateur/') && !p.endsWith('/rating')) {
+          url.pathname += '/rating';
+          node.href = url;
+        }
+      },
+    });
+  },
+
   'spankbang.com': _ => {
     init({
       css: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper { display: none !important }',
       searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
       /*onSearch: (query, form) => { // TODO
-        const url = new URL(`${origin}/s/${query}/`);
+        const url = new URL(`${origin}/s/${encodeURIComponent(query)}/`);
         const params = url.searchParams;
         params.set('d', MIN_DURATION_MINS);
         params.set('q', 'fhd');
@@ -829,7 +904,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const url = new URL(node.href);
         const params = url.searchParams;
         const p = url.pathname;
-        if (MINOR_IMPROVEMENTS && p === '/gifs') {
+        if (p === '/gifs') {
           node.classList.add(HIDE);
         } else if (!p.endsWith('/tags') && !p.includes('/playlist/') && !p.includes('/video/') && !(params.has('q') && params.has('d'))) {
           if (p === '/') {
@@ -838,6 +913,118 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           params.set('q', 'fhd');
           params.set('d', MIN_DURATION_MINS);
           updateUrl(node, url);
+        }
+      },
+    });
+  },
+
+  'taboodude.com': _ => {
+    const thumbnailSelector = 'div.item';
+    const qualitySelector = 'span.is-hd';
+    init({
+      noKeysOverride: ['KeyF'],
+      thumbnailSelector,
+      playSelector: 'div.fluid_button_play',
+      fullscreenSelector: 'div.fluid_button_fullscreen',
+      qualitySelector,
+      durationSelector: 'div.duration',
+      isUnwantedQuality: text => !['HD', '4K'].includes(text),
+      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => new URL(href).pathname.startsWith('/video/'),
+      onNodeChange: node => {
+        if (node.matches(thumbnailSelector) && !node.querySelector('span.is-hd')) {
+          node.classList.add(UNWANTED);
+        } else if (validLink(node)) {
+          const url = new URL(node.href);
+          const p = url.pathname;
+          const params = url.searchParams;
+          if (('/' === p || ['/category/', '/search', '/model/'].find(i => p.startsWith(i))) && !params.has('sort_by')) {
+            params.set('sort_by', 'quality');
+            node.href = url;
+          }
+        }
+      },
+    });
+  },
+
+  'tnaflix.com': _ => {
+    const qualitySelector = 'div.max-quality';
+    const thumbnailSelector = 'div[data-vid]';
+    const isVideoUrl = href => href.split('/').slice(-1)[0]?.startsWith('video');
+    init({
+      thumbnailSelector,
+      qualitySelector,
+      durationSelector: 'div.video-duration',
+      playSelector: 'button[aria-label="Play"]',
+      pauseSelector: 'button[aria-label="Pause"]',
+      isUnwantedQuality: text => parseFloat(text.split('p')[0]) < MIN_VIDEO_HEIGHT,
+      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl,
+      onNodeChange: node => {
+        if (node.matches(thumbnailSelector) && !node.querySelector(qualitySelector)) {
+          node.classList.add(UNWANTED);
+          return;
+        }
+
+        if (!validLink(node)) return;
+        const href = node.href;
+
+        if (isVideoUrl(href) || ['channel', 'galleries', 'profile'].find(i => href.includes(`/${i}/`)) || ['categories', 'channels', 'pornstars'].find(i => href.endsWith(`/${i}`))) return;
+
+        if (href.includes('/track/')) {
+          node.closest('div.row')?.classList.add(HIDE);
+          return;
+        }
+
+        if (href.includes('/goto/')) {
+          node.classList.add(HIDE);
+          return;
+        }
+
+        if (href.split('/').length > 4) return;
+
+        const url = new URL(href);
+        const p = url.pathname;
+        const params = url.searchParams;
+
+        if (p.includes('/search') && !params.has('d')) {
+          params.set('d', 'full');
+          node.href = url;
+        } else if (p !== '/' && !p.includes('/top-rated')) {
+          url.pathname += '/top-rated';
+          params.set('d', 'full');
+          node.href = url;
+        }
+      },
+    });
+  },
+
+  'tube8.com': _ => {
+    init({
+      css: 'div#cookie_consent_wrapper { display: none !important }',
+      videoSelector: 'video.mgp_videoElement:not(.gifVideo)',
+      playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
+      fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
+      thumbnailSelector: 'div.video-box',
+      durationSelector: 'div.video-duration',
+      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => href.includes('/porn-video/'),
+      onNodeChange: node => {
+        if (!validLink(node)) return;
+
+        const url = new URL(node.href);
+        const p = url.pathname;
+        const params = url.searchParams;
+        if (['newest.html', 'mostviewed.html', 'searches.html', 'top.html', 'cat/', 'porntags/'].find(i => p.startsWith(`/${i}`)) && (!params.has('res') || !params.has('min_minutes'))) {
+          params.set('res', 'HD');
+          params.set('min_minutes', MIN_DURATION_MINS);
+          node.href = url;
+        } else if (p.startsWith('/pornstar/') && !p.endsWith('/duration/')) {
+          url.pathname += 'duration/';
+          node.href = url;
+        } else if (p.startsWith('/channel/') && !params.has('orderBy')) {
+          params.set('orderBy', 'tr');
+          node.href = url;
         }
       },
     });
@@ -875,7 +1062,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           const query = parts[2];
           const page = parseFloat(parts[3]) || 1;
           if (query) {
-            url.pathname = `/${action}/${query}/${page}/`;
+            url.pathname = `/${action}/${encodeURIComponent(query)}/${page}/`;
             const categories = action === 'categories';
             params.set('sort', categories ? 'top-rated' : 'longest');
             params.set('date', 'all');
@@ -924,7 +1111,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       searchInputSelector: 'input[name="q"][type="text"]',
       searchFormOrSubmitButtonSelector: 'form.search-submit-container button[type="submit"], button.search-submit[type="submit"]',
       onSearch: (query, _form) => {
-        const url = new URL(`${origin}/search/${query}`);
+        const url = new URL(`${origin}/search/${encodeURIComponent(query)}`);
         const params = url.searchParams;
         params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
         params.set('min-duration', '20');
@@ -959,7 +1146,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       css: '.gold-plate, .premium-results-line { display: none !important }',
       searchInputSelector: 'input.search-input[type="text"][name="k"], div.form-group input[type="text"][placeholder="Search..."]',
-      onSearch: (query, _form) => redirect(`${searchPath}/${query}`), // FIXME
+      onSearch: (query, _form) => redirect(`${searchPath}/${encodeURIComponent(query)}`), // FIXME
       playSelector: `${containerSelector} span.player-icon-f[title="Play"]`,
       pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
       fullscreenSelector: `${containerSelector} span.player-icon-f[title="Fullscreen"]`,
@@ -981,7 +1168,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           const hasPage = parts.length > 5 && !!parseFloat(lastPart);
           const page = hasPage ? lastPart : '';
           const query = parts.slice(hasPage ? -2 : -1)[0] || '';
-          url.pathname = `${searchPath}/${query}/${page}`;
+          url.pathname = `${searchPath}/${encodeURIComponent(query)}/${page}`;
           url.search = '';
           updateUrl(node, url);
         }
@@ -1040,6 +1227,29 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           updateUrl(node, url);
         }
       },
+    });
+  },
+
+  'whoreshub.com': _ => {
+    init({
+      thumbnailSelector: 'div.thumb',
+      playSelector: 'div.fp-ui',
+      pauseSelector: 'a.fp-play',
+      fullscreenSelector: 'a.fp-screen',
+      qualitySelector: 'span.is-hd',
+      durationSelector: 'span.duration',
+      isUnwantedQuality: text => !['HD', '4K'].includes(text),
+      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => new URL(href).pathname.startsWith('/videos/'),
+    });
+  },
+
+  'xn----ztbcbceder.tv': _ => {
+    init({
+      thumbnailSelector: 'a[vid]',
+      durationSelector: 'div.durik',
+      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isVideoUrl: href => href.endsWith('.html'),
     });
   },
 }[shortDomain] || defaultInit)();
