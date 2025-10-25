@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.50
+// @version 0.51
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -38,7 +38,7 @@ let pageIsHidden = true;
 const loc = window.location;
 
 let redirectHref;
-const redirect = (href, force) => {
+const redirect = (href, force = true) => {
   if (force) {
     loc.href = href;
     return;
@@ -50,12 +50,14 @@ const redirect = (href, force) => {
     redirect(redirectHref, true);
   }
 };
-const refresh = force => redirect(loc, force);
+const refresh = (force = false) => redirect(loc, force);
 
 const origin = loc.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
 
-const JWPLAYER_SELECTOR = 'video.jw-video, video.js-player';
+const FLUID_PLAYER = '#fluid_video_wrapper_player, div.fluid_button';
+const JW_PLAYER_SELECTOR = 'video.jw-video, video.js-player';
+const KT_PLAYER_SELECTOR = 'div#kt_player';
 
 const err = (e, node) => {
   console.log(node);
@@ -135,7 +137,7 @@ const updateUrl = (node, href) => {
     if (!event.isTrusted) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    redirect(url, true);
+    redirect(url);
   }, true);
 };
 
@@ -283,7 +285,7 @@ const init = (args = {}) => {
   const maybeStartAutoplay = video => {
     if (!AUTOPLAY || pageIsHidden || playbackInitiated || playbackStarted || !video || !video.paused) return;
 
-    if (video.matches(JWPLAYER_SELECTOR)) {
+    if (video.matches(JW_PLAYER_SELECTOR)) {
       console.log('starting playback');
       // TODO: kt_player? etc.
       try {
@@ -294,7 +296,7 @@ const init = (args = {}) => {
       }
     }
 
-    if (!unmuted) {
+    if (!unmuted && video.matches('video')) {
       console.log('unmute');
       video.muted = false;
       unmuted = true;
@@ -316,14 +318,18 @@ const init = (args = {}) => {
     }
 
     if (videoPage && !playSelector && !fullscreenSelector) {
-      if (body.querySelector(JWPLAYER_SELECTOR)) {
-        console.log('detected jwplayer');
-        playSelector = 'div.jw-icon-playback';
-        fullscreenSelector = 'div.jw-icon-fullscreen';
-      } else if (body.querySelector('#fluid_video_wrapper_player, div.fluid_button')) {
+      if (body.querySelector(FLUID_PLAYER)) {
         console.log('detected fluid player');
         playSelector = 'div.fluid_button_play, div.fluid_control_playpause';
         fullscreenSelector = 'div.fluid_button_fullscreen, div.fluid_button_fullscreen_exit, div.fluid_control_fullscreen, div.fluid_button[title="Full Screen"]';
+      } else if (body.querySelector(JW_PLAYER_SELECTOR)) {
+        console.log('detected jw player');
+        playSelector = 'div.jw-icon-playback';
+        fullscreenSelector = 'div.jw-icon-fullscreen';
+      } else if (body.querySelector(KT_PLAYER_SELECTOR)) {
+        console.log('detected kt player');
+        playSelector = 'a.fp-play';
+        fullscreenSelector = 'a.fp-screen';
       }
     }
 
@@ -381,10 +387,10 @@ const init = (args = {}) => {
         return true;
       }
 
-      const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(new URL(node.href)));
+      const unwanted = (qualitySelector && node.matches(qualitySelector) && isUnwantedQuality?.(node.textContent)) || (durationSelector && node.matches(durationSelector) && isUnwantedDuration?.(node.textContent)) || (validLink(node) && isUnwantedUrl?.(node));
       if (unwanted) {
         const thumbnail = node.closest(thumbnailSelector);
-        const thumbnails = node.closest(thumbnailSelector)?.parentNode?.querySelectorAll(thumbnailSelector);
+        const thumbnails = thumbnail?.parentNode?.querySelectorAll(thumbnailSelector);
         if (thumbnails?.length > 0 && thumbnails?.length <= 2) {
           // xvideos
           thumbnails?.forEach(i => i.classList.add(UNWANTED));
@@ -469,7 +475,7 @@ const init = (args = {}) => {
       d.addEventListener('visibilitychange', _ => {
         pageIsHidden = d.hidden;
         if (redirectHref && !pageIsHidden) {
-          redirect(redirectHref, true);
+          redirect(redirectHref);
           return;
         }
         console.log('visibilitychange pageIsHidden', pageIsHidden);
@@ -555,7 +561,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const isVideoUrl = href => href.includes('/video/');
     init({
       searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${encodeURIComponent(query)}`), // FIXME
+      onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${encodeURIComponent(query)}`),
       fullscreenSelector: 'div#main_video_fluid_control_fullscreen',
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.item-quality',
@@ -612,7 +618,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         url.pathname = '/s';
         url.searchParams.set('q', query);
         url.searchParams.set(sort, longest);
-        redirect(url, true);
+        redirect(url);
       },
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.is-hd',
@@ -754,7 +760,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const url = new URL(`${origin}/search/1/`);
         url.searchParams.set('s', query);
         url.searchParams.set('duration', '3');
-        redirect(url, true);
+        redirect(url);
       },
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div.btn-yellow',
@@ -785,7 +791,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const topRated = '/top-rated/';
     init({
       searchInputSelector: 'div.header__search input[type="text"][name="search"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/?duration=3`, true),
+      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/?duration=3`),
       thumbnailSelector: 'div.thumb',
       durationSelector: 'div.thumb__duration',
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
@@ -799,7 +805,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         if (p.startsWith('/search/')) {
           params.set('duration', '3');
           updateUrl(node, url);
-        } else if (p.includes(categories) && !p.endsWith(categories) && ![longest, topRated].find(i => p.includes(`${topRated}`))) {
+        } else if (p.includes(categories) && !p.endsWith(categories) && ![longest, topRated].find(i => p.includes(i))) {
           if (p.split(',').length <= 1) {
             params.set('duration', '3');
             url.pathname += topRated;
@@ -830,7 +836,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       onSearch: (query, _form) => {
         const url = new URL(`${origin}/video/${encodeURIComponent(query)}/`);
         searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
-        redirect(url, true);
+        redirect(url);
       },
       thumbnailSelector: 'div.item',
       qualitySelector: 'i.hd_mark',
@@ -856,7 +862,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const clicked = new Set;
     init({
       searchInputSelector: 'input[type="text"]',
-      onSearch: (query, _form) => redirect(`/search/${encodeURIComponent(query)}`, true),
+      onSearch: (query, _form) => redirect(`/search/${encodeURIComponent(query)}`),
       videoSelector: 'video#VideoPlayer',
       thumbnailSelector: 'a[href*="/video/"]',
       qualitySelector: 'p',
@@ -882,6 +888,24 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           const content = node.textContent.trim();
           if (clicked.has(content) || !['1080p', 'Longest'].includes(content)) return;
           clicked.add(content);
+          node.click();
+        }
+      },
+    });
+  },
+
+  'porn00.tv': _ => {
+    let sorted = false;
+    init({
+      thumbnailSelector: 'div.item',
+      qualitySelector: 'span.is-hd',
+      durationSelector: 'div.wrap div.duration',
+      isUnwantedDuration: text => text.includes(':') && timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      isUnwantedUrl: node => !node.querySelector('div.img span.is-hd') && node.closest('div.item'),
+      isVideoUrl: href => href.includes('/video/'),
+      onNodeChange: node => {
+        if (!sorted && node.matches('div.sort a[data-parameters*="sort_by:rating"]')) {
+          sorted = true;
           node.click();
         }
       },
@@ -961,7 +985,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         container.appendChild(iframe);
       } else {
         console.log('player not found, redirecting to embedded player');
-        redirect(embedUrl);
+        redirect(embedUrl, false);
       }
     };
 
@@ -980,7 +1004,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         if (!isUnwanted(url)) {
           console.log('making single refresh attempt');
           setUnwanted(url, currentTime() + 60 * 60);
-          redirect(url, true);
+          redirect(url);
           return;
         }
 
@@ -989,7 +1013,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           const newSimilarVideos = similarVideos.difference(watchedVideos);
           const href = pickRandom(newSimilarVideos.size > 0 ? [...newSimilarVideos] : [...similarVideos]);
           if (href) {
-            redirect(href, true);
+            redirect(href);
           }
         } else {
           console.log('giving up');
@@ -1037,7 +1061,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       thumbnailSelector: 'div.phimage, li:has(span.info-wrapper)',
       durationSelector,
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
-      isUnwantedUrl: url => isUnwanted(url),
+      isUnwantedUrl: node => isUnwanted(new URL(node.href)),
       isVideoUrl,
       hideSelector: 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub, div.mgp_gridMenu, ul#headerMainMenu li.photos',
       nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, var`,
@@ -1125,7 +1149,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
       searchFormOrSubmitButtonSelector: 'form#search_form button[type="submit"][aria-label="search"], button[type="submit"][aria-label="search"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/${ending}`), // FIXME
+      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/${ending}`),
       playSelector: 'a.fp-play',
       fullscreenSelector: 'a.fp-screen',
       thumbnailSelector: 'div.thumb-item, span.video-item',
@@ -1201,13 +1225,13 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   'spankbang.com': _ => {
     init({
       searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
-      /*onSearch: (query, form) => { // TODO
+      onSearch: (query, _form) => {
         const url = new URL(`${origin}/s/${encodeURIComponent(query)}/`);
         const params = url.searchParams;
         params.set('d', MIN_DURATION_MINS);
         params.set('q', 'fhd');
         redirect(url);
-      },*/
+      },
       playSelector: 'span.i-play#play-button, button.vjs-play-control[title="Play"]',
       pauseSelector: 'button.vjs-play-control[title="Pause"]',
       fullscreenSelector: 'button.vjs-fullscreen-control',
@@ -1460,15 +1484,21 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const url = new URL(`${origin}/search/${encodeURIComponent(query)}`);
         const params = url.searchParams;
         params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
-        params.set('min-duration', '20');
+        params.set('min-duration', '30');
         params.set('length', 'full');
         redirect(url);
       },
       thumbnailSelector: 'div.video-thumb, div.thumb-list__item',
       durationSelector: 'div[data-role="video-duration"]',
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
-      hideSelector: 'div[data-block="moments"]',
+      isVideoUrl: href => href.includes('/videos/'),
+      hideSelector: 'div[data-block="moments"], div[data-role="cookies-modal"]',
       onNodeChange: node => {
+        if ((node.matches('span') && node.textContent.includes('Watch more')) || node.matches('div[class*="skeleton"]')) {
+          node.closest('div')?.classList?.add(HIDE);
+          return;
+        }
+
         if (!validLink(node)) return;
 
         const url = new URL(node.href);
@@ -1503,7 +1533,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const containerSelector = 'div#html5video';
     init({
       searchInputSelector: 'input.search-input[type="text"][name="k"], div.form-group input[type="text"][placeholder="Search..."]',
-      onSearch: (query, _form) => redirect(`${searchPath}/${encodeURIComponent(query)}`), // FIXME
+      onSearch: (query, _form) => redirect(`${searchPath}/${encodeURIComponent(query)}`),
       playSelector: `${containerSelector} span.player-icon-f[title="Play"]`,
       pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
       fullscreenSelector: `${containerSelector} span.player-icon-f[title="Fullscreen"]`,
@@ -1537,7 +1567,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   'xvideos.com': _ => {
     init({
       searchInputSelector: 'input.search-input[type="text"], input[type="text"][placeholder="Search X videos"]',
-      onSearch: (query, form) => { // FIXME
+      onSearch: (query, form) => {
         const url = new URL(form.action);
         const params = url.searchParams;
         params.set('sort', 'rating');
