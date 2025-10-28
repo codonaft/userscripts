@@ -2,15 +2,18 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.52
+// @version 0.53
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
+
+// TODO: cumlouder.com, pornone.com, pornheed.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com
 
 (_ => {
 'use strict';
 
 const IGNORE_HOSTS = []; // NOTE: without 'www.', e.g. 'xvideos.com'
+const HOME = 'google.com'; // NOTE: set your home button to 'https://www.google.com/blank.html' to get the list of supported websites
 
 const AUTOPLAY = true;
 const HIDE_EXTERNAL_LINKS = true;
@@ -167,6 +170,8 @@ const defaultArgs = {
   css: '',
   videoSelector: 'video',
   nodeChangeSelector: 'a, div, input, li, span, video',
+  searchFilter: '',
+  searchFilterParams: {},
 };
 
 const init = (args = {}) => {
@@ -175,7 +180,8 @@ const init = (args = {}) => {
     noKeysOverride,
     searchInputSelector,
     searchFormOrSubmitButtonSelector,
-    onSearch,
+    searchFilter,
+    searchFilterParams,
     videoSelector,
     playSelector,
     pauseSelector,
@@ -354,7 +360,12 @@ const init = (args = {}) => {
         event.stopImmediatePropagation();
         const query = (searchInput.value || '').trim();
         if (query.length > 0) {
-          onSearch?.(query, searchForm);
+          const [path, params] = searchFilter(query);
+          const url = new URL(`${origin}/${path}`);
+          Object
+            .entries({ ...searchFilterParams, ...params })
+            .forEach(([key, value]) => url.searchParams.set(key, value));
+          redirect(url);
         }
       };
 
@@ -545,15 +556,31 @@ const p365 = _ => {
 };
 
 const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
-({
+const sites = {
+  [HOME]: _ => {
+    document.head.innerHTML = `<style>
+      body {
+        a { color: white !important }
+        background-color: black !important;
+      }
+    </style>`;
+    body.innerHTML = Object
+      .keys(sites)
+      .filter(i => i !== HOME)
+      .map(i => `<p><a href="https://${i}">${i}</p>`)
+      .join('');
+  },
+
   '1porno365.info': p365,
   'porno365.best': p365,
 
   'anysex.com': _ => {
+    const searchFilterParams = { sort: 'top' };
     const isVideoUrl = href => href.includes('/video/');
     init({
       searchInputSelector: 'input[type="text"][name="q"][placeholder="Search"], input#search-form[type="text"][name="q"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/?sort=top&q=${encodeURIComponent(query)}`),
+      searchFilter: query => ['search/', { 'q': query }],
+      searchFilterParams,
       fullscreenSelector: 'div#main_video_fluid_control_fullscreen',
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.item-quality',
@@ -567,7 +594,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const url = new URL(node.href);
         if (url.pathname === '/') return;
 
-        url.searchParams.set('sort', 'top');
+        Object.entries(searchFilterParams).forEach(([key, value]) => url.searchParams.set(key, value));
         updateUrl(node, url);
       },
     });
@@ -602,16 +629,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 
   'bingato.com': _ => {
     const sort = 'sort_by';
-    const longest = 'longest';
+    const searchFilterParams = { [sort]: 'longest' };
     init({
       searchInputSelector: 'div.search-text input[type="text"][name="q"]',
-      onSearch: (query, _form) => {
-        const url = new URL(origin);
-        url.pathname = '/s';
-        url.searchParams.set('q', query);
-        url.searchParams.set(sort, longest);
-        redirect(url);
-      },
+      searchFilter: query => ['s', { 'q': query }],
+      searchFilterParams,
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.is-hd',
       durationSelector: 'div.duration',
@@ -623,7 +645,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const url = new URL(node.href);
         const params = url.searchParams;
         if (['/babe/', '/c/'].find(i => url.pathname.startsWith(i)) && !params.has(sort)) {
-          params.set(sort, longest);
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         }
       },
@@ -746,14 +768,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 
   'inporn.com': _ => {
     const latestUpdates = '/latest-updates/1/';
+    const searchFilterParams = { duration: 3 };
     init({
       searchInputSelector: 'div.search__container input[type="text"][name="search"]',
-      onSearch: (query, _form) => {
-        const url = new URL(`${origin}/search/1/`);
-        url.searchParams.set('s', query);
-        url.searchParams.set('duration', '3');
-        redirect(url);
-      },
+      searchFilter: query => ['search/1/', { s: query }],
+      searchFilterParams,
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div.btn-yellow',
       onNodeChange: node => {
@@ -763,13 +782,13 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const params = url.searchParams;
         if (p.startsWith('/categories/') && p.endsWith(latestUpdates)) {
           url.pathname = url.pathname.replace(latestUpdates, '/top-rated/1/');
-          params.set('duration', '3');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         } else if (['/pornsite/', '/pornstar/'].find(i => p.startsWith(i)) && p.endsWith('/videos/1/') && params.get('sort') !== 'longest') {
           params.set('sort', 'longest');
           updateUrl(node, url);
         } else if (['/search/1/', '/top-rated/1/', '/videos/latest-updates/1/'].find(i => p.startsWith(i)) && !params.has('duration')) {
-          params.set('duration', '3');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         }
       },
@@ -781,9 +800,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const categories = '/categories/';
     const longest = '/longest/';
     const topRated = '/top-rated/';
+    const searchFilterParams = { duration: 3 };
     init({
       searchInputSelector: 'div.header__search input[type="text"][name="search"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/?duration=3`),
+      searchFilter: query => [`search/${encodeURIComponent(query)}`, {}],
+      searchFilterParams,
       thumbnailSelector: 'div.thumb',
       durationSelector: 'div.thumb__duration',
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
@@ -795,18 +816,18 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const p = url.pathname;
         const params = url.searchParams;
         if (p.startsWith('/search/')) {
-          params.set('duration', '3');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         } else if (p.includes(categories) && !p.endsWith(categories) && ![longest, topRated].find(i => p.includes(i))) {
           if (p.split(',').length <= 1) {
-            params.set('duration', '3');
+            Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
             url.pathname += topRated;
           } else {
             url.pathname += longest;
           }
           updateUrl(node, url);
         } else if (p.startsWith('/videos/') && !p.includes(`/${topRated}`)) {
-          params.set('duration', '3');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           url.pathname += topRated;
           updateUrl(node, url);
         } else if (['/pornsite/', '/pornstar/'].find(i => p.startsWith(i))) {
@@ -818,18 +839,15 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'mat6tube.com': _ => {
-    const searchFilterParams = Object.entries({
+    const searchFilterParams = {
       'len': 'long',
-      'hd': '1',
-      'sort': '2',
-    });
+      'hd': 1,
+      'sort': 2,
+    };
     init({
       searchInputSelector: 'div.search input[type="search"][name="search"]',
-      onSearch: (query, _form) => {
-        const url = new URL(`${origin}/video/${encodeURIComponent(query)}/`);
-        searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
-        redirect(url);
-      },
+      searchFilter: query => [`video/${encodeURIComponent(query)}/`, {}],
+      searchFilterParams,
       thumbnailSelector: 'div.item',
       qualitySelector: 'i.hd_mark',
       durationSelector: 'div.m_time',
@@ -841,7 +859,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         if (!validLink(node)) return;
         const url = new URL(node.href);
         if (!url.searchParams.has('len')) {
-          searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
+          Object.entries(searchFilterParams).forEach(([key, value]) => url.searchParams.set(key, value));
           updateUrl(node, url);
         }
       },
@@ -854,7 +872,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const clicked = new Set;
     init({
       searchInputSelector: 'input[type="text"]',
-      onSearch: (query, _form) => redirect(`/search/${encodeURIComponent(query)}`),
+      searchFilter: query => [`search/${encodeURIComponent(query)}`, {}],
       videoSelector: 'video#VideoPlayer',
       thumbnailSelector: 'a[href*="/video/"]',
       qualitySelector: 'p',
@@ -887,6 +905,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'porn00.tv': _ => {
+    if (loc.pathname === '/') {
+      redirect('/latest-vids/');
+      return;
+    }
+
     let sorted = false;
     init({
       thumbnailSelector: 'div.item',
@@ -1041,12 +1064,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       css: '#searchSuggestions a:focus { background-color: #111111 !important }',
       searchInputSelector: 'input#searchInput[type="text"], input[type="text"][name="search"]',
-      onSearch: (query, form) => {
-        const url = new URL(form.action);
-        searchFilterParams.forEach(([key, value]) => url.searchParams.set(key, value));
-        url.searchParams.set('search', query);
-        redirect(url);
-      },
+      searchFilter: query => ['video/search', { search: query }],
+      searchFilterParams,
       playSelector,
       fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
       videoSelector,
@@ -1082,7 +1101,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const p = url.pathname;
         const parts = p.split('/');
         if (['/video', '/video/search'].includes(p) || p.startsWith('/categories/')) {
-          searchFilterParams.forEach(([key, value]) => params.set(key, value));
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
         } else if (p.startsWith('/pornstar/')) {
           if (parts.length === 3) {
             url.pathname = [...parts, 'videos', 'upload'].join('/');
@@ -1141,7 +1160,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
       searchFormOrSubmitButtonSelector: 'form#search_form button[type="submit"][aria-label="search"], button[type="submit"][aria-label="search"]',
-      onSearch: (query, _form) => redirect(`${origin}/search/${encodeURIComponent(query)}/${ending}`),
+      searchFilter: query => [`search/${encodeURIComponent(query)}/${ending}`, {}],
       playSelector: 'a.fp-play',
       fullscreenSelector: 'a.fp-screen',
       thumbnailSelector: 'div.thumb-item, span.video-item',
@@ -1185,7 +1204,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'redtube.com': _ => {
+    const searchFilterParams = { min_duration: MIN_DURATION_MINS, hd: 1 };
     init({
+      searchInputSelector: 'input[type="text"][name="search"]',
+      searchFilter: query => ['', { search: query }],
+      searchFilterParams,
       thumbnailSelector: 'div.video_block_wrapper',
       videoSelector: 'video.mgp_videoElement:not(.gifVideo)',
       playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
@@ -1200,8 +1223,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const params = url.searchParams;
         const p = url.pathname;
         if ((p === '/' || p.startsWith('/redtube/') || params.has('search')) && (!params.has('min_duration') || !params.has('hd'))) {
-          params.set('min_duration', MIN_DURATION_MINS);
-          params.set('hd', '1');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         } else if (['channels', 'pornstar'].find(i => p.startsWith(`/${i}/`)) && !p.endsWith('/longest')) {
           url.pathname += '/longest';
@@ -1215,15 +1237,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'spankbang.com': _ => {
+    const searchFilterParams = { d: MIN_DURATION_MINS, q: 'fhd' };
     init({
       searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
-      onSearch: (query, _form) => {
-        const url = new URL(`${origin}/s/${encodeURIComponent(query)}/`);
-        const params = url.searchParams;
-        params.set('d', MIN_DURATION_MINS);
-        params.set('q', 'fhd');
-        redirect(url);
-      },
+      searchFilter: query => [`s/${encodeURIComponent(query)}/`, {}],
+      searchFilterParams,
       playSelector: 'span.i-play#play-button, button.vjs-play-control[title="Play"]',
       pauseSelector: 'button.vjs-play-control[title="Pause"]',
       fullscreenSelector: 'button.vjs-fullscreen-control',
@@ -1245,8 +1263,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           if (p === '/') {
             url.pathname = '/trending_videos/'
           }
-          params.set('q', 'fhd');
-          params.set('d', MIN_DURATION_MINS);
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         }
       },
@@ -1254,9 +1271,13 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'taboodude.com': _ => {
+    const searchFilterParams = { 'sort_by': 'quality' };
     const thumbnailSelector = 'div.item';
     const qualitySelector = 'span.is-hd';
     init({
+      searchInputSelector: 'input[type="text"][name="q"]',
+      searchFilter: query => ['search', { q: query }],
+      searchFilterParams,
       thumbnailSelector,
       qualitySelector,
       durationSelector: 'div.duration',
@@ -1269,9 +1290,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         } else if (validLink(node)) {
           const url = new URL(node.href);
           const p = url.pathname;
-          const params = url.searchParams;
-          if (('/' === p || ['/category/', '/search', '/model/'].find(i => p.startsWith(i))) && !params.has('sort_by')) {
-            params.set('sort_by', 'quality');
+          if (p === '/' || ['/category/', '/search', '/model/'].find(i => p.startsWith(i))) {
+            Object.entries(searchFilterParams).forEach(([key, value]) => url.searchParams.set(key, value));
             updateUrl(node, url);
           }
         }
@@ -1280,10 +1300,14 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'tnaflix.com': _ => {
+    const searchFilterParams = { d: 'full' };
     const qualitySelector = 'div.max-quality';
     const thumbnailSelector = 'div[data-vid]';
     const isVideoUrl = href => href.split('/').slice(-1)[0]?.startsWith('video');
     init({
+      searchInputSelector: 'input[type="text"][name="what"]',
+      searchFilter: query => ['search', { 'what': query }],
+      searchFilterParams,
       thumbnailSelector,
       qualitySelector,
       durationSelector: 'div.video-duration',
@@ -1320,11 +1344,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const params = url.searchParams;
 
         if (p.includes('/search') && !params.has('d')) {
-          params.set('d', 'full');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         } else if (p !== '/' && !p.includes('/top-rated')) {
           url.pathname += '/top-rated';
-          params.set('d', 'full');
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         }
       },
@@ -1332,7 +1356,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'tube8.com': _ => {
+    const searchFilterParams = { res: 'HD', min_minutes: MIN_DURATION_MINS };
     init({
+      searchInputSelector: 'input[type="text"][name="q"]',
+      searchFilter: query => ['searches.html/', { q: query }],
+      searchFilterParams,
       videoSelector: 'video.mgp_videoElement:not(.gifVideo)',
       playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
       fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
@@ -1348,8 +1376,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const p = url.pathname;
         const params = url.searchParams;
         if (['newest.html', 'mostviewed.html', 'searches.html', 'top.html', 'cat/', 'porntags/'].find(i => p.startsWith(`/${i}`)) && (!params.has('res') || !params.has('min_minutes'))) {
-          params.set('res', 'HD');
-          params.set('min_minutes', MIN_DURATION_MINS);
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         } else if (p.startsWith('/pornstar/') && !p.endsWith('/duration/')) {
           url.pathname += 'duration/';
@@ -1364,9 +1391,12 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 
   'txxx.com': _ => {
     const hd = 'HD';
+    const searchFilterParams = { hd: 'hd', duration: 3 };
     const isVideoUrl = href => href.includes('/videos/');
     init({
-      searchInputSelector: 'div.input-container input[type="text"], input[type="text"][placeholder="Search..."]',
+      searchInputSelector: 'input[type="text"][placeholder="Search by videos..."]',
+      searchFilter: query => ['search/', { s: query }],
+      searchFilterParams,
       thumbnailSelector: 'div.thumb',
       qualitySelector: 'div.labels',
       durationSelector: 'div.labels',
@@ -1379,11 +1409,10 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const url = new URL(node.href);
         const p = url.pathname;
         const params = url.searchParams;
+        Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
         if (p.startsWith('/search/')) {
           const page = parseFloat(p.split('/search/')[1]?.split('/')[0]) || 1;
           url.pathname = `/search/${page}/`;
-          params.set('type', 'hd');
-          params.set('duration', '3');
           updateUrl(node, url);
         } else if (['/categories/', '/channel/', '/models/'].find(i => p.startsWith(i))) {
           const parts = p.split('/');
@@ -1395,7 +1424,6 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
             const categories = action === 'categories';
             params.set('sort', categories ? 'top-rated' : 'longest');
             params.set('date', 'all');
-            params.set('type', 'hd');
             params.set('duration', categories ? '3' : 'all');
             updateUrl(node, url);
           }
@@ -1416,8 +1444,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 
   'vxxx.com': _ => {
     const minDurationMins = 8; // NOTE: content is a disaster here
+    const searchFilterParams = { sort: 'top-rated' };
     init({
       searchInputSelector: 'div.search-input input[type="text"], input[type="text"][placeholder="Search..."]',
+      searchFilter: query => [`search/${encodeURIComponent(query)}/1/`, {}],
+      searchFilterParams,
       fullscreenSelector: 'div[role="button"][aria-label="Fullscreen"], div[role="button"][aria-label="Exit Fullscreen"]',
       thumbnailSelector: 'div.thumb, a.thumb',
       durationSelector: 'span.duration',
@@ -1434,7 +1465,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           if (!p.split('/').find(parseFloat)) {
             url.pathname += '/1/';
           }
-          url.searchParams.set('sort', 'top-rated');
+          Object.entries(searchFilterParams).forEach(([key, value]) => url.searchParams.set(key, value));
           updateUrl(node, url);
         }
       },
@@ -1457,6 +1488,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
 
   'xgroovy.com': _ => {
     init({
+      searchInputSelector: 'input[type="text"][name="q"]',
+      searchFilter: query => [`search/${encodeURIComponent(query.replaceAll(' ', '-'))}/`, { sort: 'duration' }],
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.is-hd',
       durationSelector: 'div.duration',
@@ -1472,14 +1505,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     init({
       searchInputSelector: 'input[name="q"][type="text"]',
       searchFormOrSubmitButtonSelector: 'form.search-submit-container button[type="submit"], button.search-submit[type="submit"]',
-      onSearch: (query, _form) => {
-        const url = new URL(`${origin}/search/${encodeURIComponent(query)}`);
-        const params = url.searchParams;
-        params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
-        params.set('min-duration', '30');
-        params.set('length', 'full');
-        redirect(url);
-      },
+      searchFilter: query => [`search/${encodeURIComponent(query)}`, {
+        quality: `${MIN_VIDEO_HEIGHT}p`,
+        'min-duration': 30,
+        'length': 'full'
+      }],
       thumbnailSelector: 'div.video-thumb, div.thumb-list__item',
       durationSelector: 'div[data-role="video-duration"]',
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
@@ -1521,11 +1551,11 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'xnxx.com': _ => {
-    const searchPath = '/search/hits/20min+/fullhd';
+    const searchPath = 'search/hits/20min+/fullhd';
     const containerSelector = 'div#html5video';
     init({
       searchInputSelector: 'input.search-input[type="text"][name="k"], div.form-group input[type="text"][placeholder="Search..."]',
-      onSearch: (query, _form) => redirect(`${searchPath}/${encodeURIComponent(query)}`),
+      searchFilter: query => [`${searchPath}/${encodeURIComponent(query)}`, {}],
       playSelector: `${containerSelector} span.player-icon-f[title="Play"]`,
       pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
       fullscreenSelector: `${containerSelector} span.player-icon-f[title="Fullscreen"]`,
@@ -1549,7 +1579,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
           const hasPage = parts.length > 5 && !!parseFloat(lastPart);
           const page = hasPage ? lastPart : '';
           const query = parts.slice(hasPage ? -2 : -1)[0] || '';
-          url.pathname = `${searchPath}/${encodeURIComponent(query)}/${page}`;
+          url.pathname = `/${searchPath}/${encodeURIComponent(query)}/${page}`;
           url.search = '';
           updateUrl(node, url);
         }
@@ -1558,17 +1588,15 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
   },
 
   'xvideos.com': _ => {
+    const searchFilterParams = {
+      sort: 'rating',
+      durf: `${MIN_DURATION_MINS}min_more`,
+      quality: `${MIN_VIDEO_HEIGHT}P`,
+    };
     init({
       searchInputSelector: 'input.search-input[type="text"], input[type="text"][placeholder="Search X videos"]',
-      onSearch: (query, form) => {
-        const url = new URL(form.action);
-        const params = url.searchParams;
-        params.set('sort', 'rating');
-        params.set('durf', `${MIN_DURATION_MINS}min_more`);
-        params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
-        url.searchParams.set('k', query);
-        redirect(url);
-      },
+      searchFilter: query => ['', { k: query }],
+      searchFilterParams,
       thumbnailSelector: 'div.thumb-inside, div.video-thumb, div.thumb-under, div.video-under',
       playSelector: 'span.player-icon-f[title="Play"]',
       pauseSelector: 'span.player-icon-f[title="Pause"]',
@@ -1592,9 +1620,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         const params = url.searchParams;
         const p = url.pathname;
         if (p === '/' && params.has('k') && !params.has('quality')) {
-          params.set('sort', 'rating');
-          params.set('durf', `${MIN_DURATION_MINS}min_more`);
-          params.set('quality', `${MIN_VIDEO_HEIGHT}P`);
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
           return;
         } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
@@ -1619,6 +1645,8 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
         html { background: black !important }
         .heading-sort .heading-sort-active { color: #ffd030 !important }
       `,
+      searchInputSelector: 'input#searchInput[type="text"]',
+      searchFilter: query => [`x/${query.replaceAll(' ', '-')}${topRated}`, {}],
       thumbnailSelector: 'article.thumb',
       durationSelector: 'span.thumb-box-title',
       isUnwantedDuration: text => text.includes(':') && timeToSeconds(text) < MIN_DURATION_MINS * 60,
@@ -1629,5 +1657,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       },
     });
   },
-}[shortDomain] || defaultInit)();
+};
+(sites[shortDomain] || defaultInit)();
+
 })();

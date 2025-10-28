@@ -1,16 +1,17 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.17
+// @version 0.18
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @match https://*.archive.org/*
+// @match https://*.pornhub.com/*
 // @match https://chat.deepseek.com/*
 // @match https://chat.qwen.ai/*
 // @match https://chatgpt.com/*
 // @match https://hqporner.com/*
 // @match https://pmvhaven.com/*
 // @match https://www.cvedetails.com/*
-// @match https://*.pornhub.com/*
 // @match https://www.porntrex.com/*
+// @match https://www.whoreshub.com/*
 // @match https://www.xnxx.com/*
 // @match https://www.xvideos.com/*
 // @match https://xhamster.com/*
