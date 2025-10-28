@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.51
+// @version 0.52
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -89,18 +89,12 @@ const timeToSeconds = rawText => {
   return total;
 };
 
-const focus = (node, scrollTo) => {
+const focus = node => {
   if (!node) return;
   if (!node.hasAttribute('tabindex')) {
     node.setAttribute('tabindex', 1);
   }
-
-  // TODO
-  /*const { target } = getTopNode(document, node, 0.5, 0.5);
-  target.focus({ preventScroll: true });*/
-
-  const preventScroll = !scrollTo; // TODO: always true?
-  node.focus({ preventScroll });
+  node.focus({ preventScroll: true });
 };
 
 const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) => {
@@ -287,7 +281,6 @@ const init = (args = {}) => {
 
     if (video.matches(JW_PLAYER_SELECTOR)) {
       console.log('starting playback');
-      // TODO: kt_player? etc.
       try {
         video.play();
         return;
@@ -413,8 +406,7 @@ const init = (args = {}) => {
 
     const nonPreviewVideos = [...body.querySelectorAll(videoSelector)].filter(i => {
       const text = [...i.classList.values()].join(' ').toLowerCase();
-      //return !i.hasAttribute('loop') && !text.includes('preview') && !text.includes('lazyload');
-      return !text.includes('preview') && !text.includes('lazyload'); // TODO
+      return !text.includes('preview') && !text.includes('lazyload');
     });
     const sortedVideos = nonPreviewVideos
       .filter(i => i.offsetHeight > 0)
@@ -455,7 +447,7 @@ const init = (args = {}) => {
 
     video.addEventListener('playing', _ => {
       console.log('playback is started')
-      playbackStarted = true; // TODO: use player property?
+      playbackStarted = true;
       focus(video);
     }, { once: true });
 
@@ -486,7 +478,7 @@ const init = (args = {}) => {
     video.addEventListener('play', _ => {
       console.log('playback is initiated');
       docs.forEach(d => d.removeEventListener('mousemove', mouseMove));
-      playbackInitiated = true; // TODO: use player property?
+      playbackInitiated = true;
       maybeSetRandomPosition();
     }, { once: true });
 
@@ -1374,7 +1366,7 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
     const hd = 'HD';
     const isVideoUrl = href => href.includes('/videos/');
     init({
-      searchInputSelector: 'div.input-container input[type="text"], input[type="text"][placeholder="Search..."]', // TODO: document.querySelector('div.search button.btn-open-search').click()
+      searchInputSelector: 'div.input-container input[type="text"], input[type="text"][placeholder="Search..."]',
       thumbnailSelector: 'div.thumb',
       qualitySelector: 'div.labels',
       durationSelector: 'div.labels',
@@ -1538,15 +1530,16 @@ const defaultInit = _ => init({ noKeysOverride: ['KeyF', 'Space'] });
       pauseSelector: `${containerSelector} span.player-icon-f[title="Pause"]`,
       fullscreenSelector: `${containerSelector} span.player-icon-f[title="Fullscreen"]`,
       videoSelector: `${containerSelector} video`,
-      // TODO: thumbnailSelector: 'div.thumb',
-      // TODO: qualitySelector: 'div.video-hd',
-      // TODO: durationSelector: 'span.right',
-      // TODO: isUnwantedDuration: text => parseFloat(text.split('mins')[0] || 0) < MIN_DURATION_MINS,
-      // TODO: isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
+      thumbnailSelector: 'div.thumb-block',
+      qualitySelector: 'span.video-hd',
+      durationSelector: 'div.thumb-under p.metadata',
+      isUnwantedQuality: text => parseFloat((text.split('\n').find(i => i.endsWith('p'))?.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
+      isUnwantedDuration: text => parseFloat(text.split('\n').find(i => i.endsWith('min'))?.split('min')[0] || 0) < MIN_DURATION_MINS,
       isVideoUrl: href => href.includes('/video-'),
       hideSelector: '.gold-plate, .premium-results-line',
+      nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, p`,
       onNodeChange: node => {
-        if (!validLink(node)) return;
+        if (!validLink(node) || node.closest('div#listing-page-filters-block')) return;
 
         const url = new URL(node.href);
         const p = url.pathname;
