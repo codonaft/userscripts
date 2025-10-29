@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.53
+// @version 0.54
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -168,10 +168,11 @@ const subscribeOnChanges = (node, selector, f) => {
 
 const defaultArgs = {
   css: '',
-  videoSelector: 'video',
-  nodeChangeSelector: 'a, div, input, li, span, video',
   searchFilter: '',
   searchFilterParams: {},
+  videoSelector: 'video',
+  isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
+  nodeChangeSelector: 'a, div, input, li, span, video',
 };
 
 const init = (args = {}) => {
@@ -179,7 +180,6 @@ const init = (args = {}) => {
     css,
     noKeysOverride,
     searchInputSelector,
-    searchFormOrSubmitButtonSelector,
     searchFilter,
     searchFilterParams,
     videoSelector,
@@ -343,7 +343,7 @@ const init = (args = {}) => {
       docs.push(document);
     }
 
-    if (!searchInputInitialized && (node.matches(searchInputSelector) || node.matches(searchFormOrSubmitButtonSelector))) {
+    if (!searchInputInitialized && node.matches(searchInputSelector)) {
       console.log('initializing search input');
       searchInputInitialized = true;
       const searchInput = node.matches(searchInputSelector) ? node : body.querySelector(searchInputSelector);
@@ -351,9 +351,6 @@ const init = (args = {}) => {
         console.error('search input not found');
         return true;
       }
-
-      const formOrButton = body.querySelector(searchFormOrSubmitButtonSelector);
-      const searchForm = formOrButton?.tagName === 'FORM' ? formOrButton : (node.closest('form') || formOrButton?.closest('form'));
 
       const handleSearch = event => {
         event.preventDefault();
@@ -369,10 +366,7 @@ const init = (args = {}) => {
         }
       };
 
-      if (formOrButton?.tagName === 'BUTTON') {
-        formOrButton.addEventListener('click', handleSearch, true);
-      }
-      searchForm?.addEventListener('submit', handleSearch, true);
+      searchInput.closest('form')?.addEventListener('submit', handleSearch, true);
       searchInput.addEventListener('keydown', event => {
       if (!event.isTrusted) return;
         if (noKeysOverride?.includes(event.code)) return;
@@ -539,7 +533,6 @@ const p365 = _ => {
   init({
     thumbnailSelector: 'li.video_block',
     durationSelector: 'span.duration',
-    isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
     isVideoUrl,
     hideSelector: 'div.cat_description',
     onNodeChange: node => {
@@ -565,9 +558,13 @@ const sites = {
       }
     </style>`;
     body.innerHTML = Object
-      .keys(sites)
-      .filter(i => i !== HOME)
-      .map(i => `<p><a href="https://${i}">${i}</p>`)
+      .entries(sites)
+      .filter(([i, _]) => i !== HOME)
+      .map(([i, handler]) => {
+        const protocol = handler === p365 ? 'http' : 'https';
+        const href = `${protocol}://${i}`;
+        return `<p><a href="${href}">${href}</p>`;
+      })
       .join('');
   },
 
@@ -585,7 +582,6 @@ const sites = {
       thumbnailSelector: 'div.item',
       qualitySelector: 'span.item-quality',
       durationSelector: 'div.duration',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isVideoUrl,
       onNodeChange: node => {
@@ -614,7 +610,6 @@ const sites = {
     const isVideoUrl = href => new URL(href).pathname !== '/';
     init({
       noKeysOverride: ['Space'],
-      //playSelector: 'button.x-player__play-btn',
       fullscreenSelector: 'button.x-player__fullscreen-btn',
       thumbnailSelector: 'div.tw-relative[data-testid="unit"]',
       durationSelector: 'span[data-testid="unit-amount"]',
@@ -638,7 +633,6 @@ const sites = {
       qualitySelector: 'span.is-hd',
       durationSelector: 'div.duration',
       isUnwantedQuality: text => text !== 'HD',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/item/'),
       onNodeChange: node => {
         if (!validLink(node)) return;
@@ -689,7 +683,6 @@ const sites = {
     init({
       thumbnailSelector: 'section.box',
       durationSelector: 'span.fa-clock-o',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/hdporn/'),
     });
   },
@@ -712,7 +705,6 @@ const sites = {
       qualitySelector: 'span.quality-icon',
       durationSelector: 'span.time',
       isUnwantedQuality: text => !text.includes('HD'),
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div.vip',
       onNodeChange: node => {
@@ -807,7 +799,6 @@ const sites = {
       searchFilterParams,
       thumbnailSelector: 'div.thumb',
       durationSelector: 'div.thumb__duration',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl,
       onNodeChange: node => {
         if (!validLink(node) || isVideoUrl(node.href) || node.closest('div.filters')) return;
@@ -1071,7 +1062,6 @@ const sites = {
       videoSelector,
       thumbnailSelector: 'div.phimage, li:has(span.info-wrapper)',
       durationSelector,
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isUnwantedUrl: node => isUnwanted(new URL(node.href)),
       isVideoUrl,
       hideSelector: 'div.mgp_topBar, div.mgp_thumbnailsGrid, img.mgp_pornhub, div.mgp_gridMenu, ul#headerMainMenu li.photos',
@@ -1159,7 +1149,6 @@ const sites = {
 
     init({
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
-      searchFormOrSubmitButtonSelector: 'form#search_form button[type="submit"][aria-label="search"], button[type="submit"][aria-label="search"]',
       searchFilter: query => [`search/${encodeURIComponent(query)}/${ending}`, {}],
       playSelector: 'a.fp-play',
       fullscreenSelector: 'a.fp-screen',
@@ -1167,7 +1156,6 @@ const sites = {
       qualitySelector: 'span.quality',
       durationSelector: 'div.durations, span.video-item-duration',
       isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => {
         const p = new URL(href).pathname;
         return p.startsWith('/video/') || (p.startsWith('/playlists/') && p.split('/').length > 3);
@@ -1198,7 +1186,6 @@ const sites = {
     init({
       thumbnailSelector: 'div.item_cont',
       durationSelector: 'div.item_dur',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/videos/'),
     });
   },
@@ -1214,7 +1201,6 @@ const sites = {
       playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
       fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
       durationSelector: 'div.duration',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => parseFloat(new URL(href).pathname.split('/')[1]) || false,
       onNodeChange: node => {
         if (!validLink(node) || node.closest('div.videos_sorting_container')) return;
@@ -1248,7 +1234,6 @@ const sites = {
       videoSelector: 'video#main_video_player_html5_api',
       thumbnailSelector: 'div[data-testid="video-item"]',
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper',
       onNodeChange: node => {
@@ -1282,7 +1267,6 @@ const sites = {
       qualitySelector,
       durationSelector: 'div.duration',
       isUnwantedQuality: text => !['HD', '4K'].includes(text),
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/video/'),
       onNodeChange: node => {
         if (node.matches(thumbnailSelector) && !node.querySelector('span.is-hd')) {
@@ -1314,7 +1298,6 @@ const sites = {
       playSelector: 'button[aria-label="Play"]',
       pauseSelector: 'button[aria-label="Pause"]',
       isUnwantedQuality: text => parseFloat(text.split('p')[0]) < MIN_VIDEO_HEIGHT,
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl,
       onNodeChange: node => {
         if (node.matches(thumbnailSelector) && !node.querySelector(qualitySelector)) {
@@ -1366,7 +1349,6 @@ const sites = {
       fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
       thumbnailSelector: 'div.video-box',
       durationSelector: 'div.video-duration',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/porn-video/'),
       hideSelector: 'div#cookie_consent_wrapper',
       onNodeChange: node => {
@@ -1437,7 +1419,6 @@ const sites = {
       fullscreenSelector: 'div.fluid_button[title="Full Screen"]',
       thumbnailSelector: 'article.loop-post',
       durationSelector: 'p.meta span:has(i.fa-clock)',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       hideSelector: '#onPauseAdContainer',
     });
   },
@@ -1481,7 +1462,6 @@ const sites = {
       qualitySelector: 'span.is-hd',
       durationSelector: 'span.duration',
       isUnwantedQuality: text => !['HD', '4K'].includes(text),
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/videos/'),
     });
   },
@@ -1504,7 +1484,6 @@ const sites = {
     const best = 'hd/full-length/best';
     init({
       searchInputSelector: 'input[name="q"][type="text"]',
-      searchFormOrSubmitButtonSelector: 'form.search-submit-container button[type="submit"], button.search-submit[type="submit"]',
       searchFilter: query => [`search/${encodeURIComponent(query)}`, {
         quality: `${MIN_VIDEO_HEIGHT}p`,
         'min-duration': 30,
@@ -1512,7 +1491,6 @@ const sites = {
       }],
       thumbnailSelector: 'div.video-thumb, div.thumb-list__item',
       durationSelector: 'div[data-role="video-duration"]',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/videos/'),
       hideSelector: 'div[data-block="moments"], div[data-role="cookies-modal"]',
       onNodeChange: node => {
@@ -1543,7 +1521,6 @@ const sites = {
     init({
       thumbnailSelector: 'a[vid]',
       durationSelector: 'div.durik',
-      isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.endsWith('.html'),
       hideSelector: 'p',
       nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, p`,
