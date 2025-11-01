@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.55
+// @version 0.56
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -35,8 +35,17 @@ const UNWANTED = '__unwanted';
 const HIDE = '__hide';
 const INITIALIZED = '__initialized';
 
-let unmuted = false;
 let pageIsHidden = true;
+let unmuted = false;
+let initializedVideo = false;
+let playbackInitiated = false;
+let playbackStarted = false;
+const resetVideo = _ => {
+  console.log('reset video');
+  initializedVideo = false;
+  playbackInitiated = false;
+  playbackStarted = false;
+};
 
 const loc = window.location;
 
@@ -207,9 +216,6 @@ const init = (args = {}) => {
   `);
 
   let searchInputInitialized = false;
-  let initializedVideo = false;
-  let playbackInitiated = false;
-  let playbackStarted = false;
 
   const findPlayButton = video => {
     const selector = !video.paused && pauseSelector ? pauseSelector : playSelector;
@@ -312,9 +318,7 @@ const init = (args = {}) => {
     if (newHref !== lastHref) {
       console.log('new page', newHref);
       lastHref = newHref;
-      initializedVideo = false;
-      playbackInitiated = false;
-      playbackStarted = false;
+      resetVideo();
     }
 
     if (videoPage && !playSelector && !fullscreenSelector) {
@@ -329,7 +333,7 @@ const init = (args = {}) => {
       } else if (body.querySelector(KT_PLAYER_SELECTOR)) {
         console.log('detected kt player');
         playSelector = 'a.fp-play';
-        fullscreenSelector = 'a.fp-screen';
+        fullscreenSelector = 'a.fp-fullscreen';
       }
     }
 
@@ -1153,7 +1157,7 @@ const sites = {
       searchFilter: query => [`search/${encodeURIComponent(query)}/${ending}`, {}],
       playSelector: 'a.fp-play',
       fullscreenSelector: 'a.fp-screen',
-      thumbnailSelector: 'div.thumb-item, span.video-item',
+      thumbnailSelector: 'div.thumb-item, div.video-item, span.video-item',
       qualitySelector: 'span.quality',
       durationSelector: 'div.durations, span.video-item-duration',
       isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
@@ -1165,7 +1169,13 @@ const sites = {
         if (!validLink(node)) return;
 
         const href = node.href;
-        if (href.includes('/video/')) return; // TODO: refresh page if part of playlist
+        if (href.includes('/video/')) {
+          node.addEventListener('click', _ => {
+            if (!event.isTrusted) return;
+            resetVideo();
+          }, true);
+          return;
+        }
         if (href.includes('/models/') && href.length === origin.length + '/models/a/'.length) return;
         if ([`/${ending}`, '/channels/', '/tags/'].find(i => href.endsWith(i))) return;
         if (node.closest('div.sort')) return;
@@ -1460,9 +1470,6 @@ const sites = {
   'whoreshub.com': _ => {
     init({
       thumbnailSelector: 'div.thumb',
-      playSelector: 'div.fp-ui',
-      pauseSelector: 'a.fp-play',
-      fullscreenSelector: 'a.fp-screen',
       qualitySelector: 'span.is-hd',
       durationSelector: 'span.duration',
       isUnwantedQuality: text => !['HD', '4K'].includes(text),
