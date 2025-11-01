@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.54
+// @version 0.55
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -57,6 +57,7 @@ const refresh = (force = false) => redirect(loc, force);
 
 const origin = loc.origin;
 const validLink = node => node?.tagName === 'A' && node?.href?.startsWith(origin);
+const parts = pathname => pathname.split('/').filter(i => i.length > 0);
 
 const FLUID_PLAYER = '#fluid_video_wrapper_player, div.fluid_button';
 const JW_PLAYER_SELECTOR = 'video.jw-video, video.js-player';
@@ -540,7 +541,7 @@ const p365 = _ => {
       const url = new URL(node.href);
       const p = url.pathname;
       const topRated = '/toprated';
-      if (!p.endsWith(topRated) && ((p.split('/').length < 3 && !['/blog', '/models'].includes(p)) || p.startsWith('/models/'))) {
+      if (!p.endsWith(topRated) && ((parts(p).length < 3 && !['/blog', '/models'].includes(p)) || p.startsWith('/models/'))) {
         url.pathname += topRated;
         updateUrl(node, url);
       }
@@ -957,19 +958,19 @@ const sites = {
       }
       return result;
     };
-    const videoId = url => url.searchParams.get('viewkey') || url.pathname.split('/').slice(-1)[0];
+    const videoId = url => url.searchParams.get('viewkey') || parts(url.pathname).slice(-1)[0];
     const isVideoUrl = href => href.includes('/view_video.php') || href.includes('/embed/');
     const watchedVideos = new Set;
     const similarVideos = new Set;
 
     const disliked = body => !!body.querySelector('div.active[data-title="I Dislike This"]');
 
-    const searchFilterParams = Object.entries({
+    const searchFilterParams = {
       'min_duration': MIN_DURATION_MINS,
       'hd': 1,
       'o': 'tr',
       't': 'm',
-    });
+    };
 
     const fatalFallback = _ => {
       console.log('fallback to embedded player');
@@ -1089,19 +1090,19 @@ const sites = {
         const url = new URL(node.href.startsWith('https:') ? node.href : `${origin}${node.href}`);
         const params = url.searchParams;
         const p = url.pathname;
-        const parts = p.split('/');
+        const ps = parts(p);
         if (['/video', '/video/search'].includes(p) || p.startsWith('/categories/')) {
           Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
         } else if (p.startsWith('/pornstar/')) {
-          if (parts.length === 3) {
-            url.pathname = [...parts, 'videos', 'upload'].join('/');
+          if (ps.length === 2) {
+            url.pathname = [...ps, 'videos', 'upload'].join('/');
           } else if (!p.endsWith('/videos/upload')) {
             return;
           }
           params.set('o', 'lg');
         } else if (['/model/', '/channels/'].find(i => p.startsWith(i))) {
-          if (parts.length === 3) {
-            url.pathname = [...parts, 'videos'].join('/');
+          if (ps.length === 2) {
+            url.pathname = [...ps, 'videos'].join('/');
           } else if (!p.endsWith('/videos')) {
             return;
           }
@@ -1158,13 +1159,13 @@ const sites = {
       isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
       isVideoUrl: href => {
         const p = new URL(href).pathname;
-        return p.startsWith('/video/') || (p.startsWith('/playlists/') && p.split('/').length > 3);
+        return p.startsWith('/video/') || (p.startsWith('/playlists/') && parts(p).length > 2);
       },
       onNodeChange: node => {
         if (!validLink(node)) return;
 
         const href = node.href;
-        if (href.includes('/video/')) return;
+        if (href.includes('/video/')) return; // TODO: refresh page if part of playlist
         if (href.includes('/models/') && href.length === origin.length + '/models/a/'.length) return;
         if ([`/${ending}`, '/channels/', '/tags/'].find(i => href.endsWith(i))) return;
         if (node.closest('div.sort')) return;
@@ -1201,7 +1202,7 @@ const sites = {
       playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
       fullscreenSelector: 'div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
       durationSelector: 'div.duration',
-      isVideoUrl: href => parseFloat(new URL(href).pathname.split('/')[1]) || false,
+      isVideoUrl: href => parseFloat(parts(new URL(href).pathname)[0]) || false,
       onNodeChange: node => {
         if (!validLink(node) || node.closest('div.videos_sorting_container')) return;
 
@@ -1222,7 +1223,7 @@ const sites = {
     });
   },
 
-  'spankbang.com': _ => {
+  'spankbang.com': _ => { // FIXME: random position
     const searchFilterParams = { d: MIN_DURATION_MINS, q: 'fhd' };
     init({
       searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
@@ -1287,7 +1288,7 @@ const sites = {
     const searchFilterParams = { d: 'full' };
     const qualitySelector = 'div.max-quality';
     const thumbnailSelector = 'div[data-vid]';
-    const isVideoUrl = href => href.split('/').slice(-1)[0]?.startsWith('video');
+    const isVideoUrl = href => parts(href).slice(-1)[0]?.startsWith('video');
     init({
       searchInputSelector: 'input[type="text"][name="what"]',
       searchFilter: query => ['search', { 'what': query }],
@@ -1320,10 +1321,10 @@ const sites = {
           return;
         }
 
-        if (href.split('/').length > 4) return;
-
         const url = new URL(href);
         const p = url.pathname;
+        if (parts(p).length > 1) return;
+
         const params = url.searchParams;
 
         if (p.includes('/search') && !params.has('d')) {
@@ -1366,6 +1367,9 @@ const sites = {
         } else if (p.startsWith('/channel/') && !params.has('orderBy')) {
           params.set('orderBy', 'tr');
           updateUrl(node, url);
+        } else if (p.startsWith('/amateur/') && parts(p).length === 2 && !node.closest('ul.filter-list')) {
+          url.pathname += '/rating/';
+          updateUrl(node, url);
         }
       },
     });
@@ -1373,7 +1377,7 @@ const sites = {
 
   'txxx.com': _ => {
     const hd = 'HD';
-    const searchFilterParams = { hd: 'hd', duration: 3 };
+    const searchFilterParams = { type: 'hd', duration: 3 };
     const isVideoUrl = href => href.includes('/videos/');
     init({
       searchInputSelector: 'input[type="text"][placeholder="Search by videos..."]',
@@ -1397,10 +1401,10 @@ const sites = {
           url.pathname = `/search/${page}/`;
           updateUrl(node, url);
         } else if (['/categories/', '/channel/', '/models/'].find(i => p.startsWith(i))) {
-          const parts = p.split('/');
-          const action = parts[1];
-          const query = parts[2];
-          const page = parseFloat(parts[3]) || 1;
+          const ps = parts(p);
+          const action = ps[0];
+          const query = ps[1];
+          const page = parseFloat(ps[2]) || 1;
           if (query) {
             url.pathname = `/${action}/${encodeURIComponent(query)}/${page}/`;
             const categories = action === 'categories';
@@ -1443,7 +1447,7 @@ const sites = {
           if (p.includes('/pornstar') && !p.includes('/videos/')) {
             url.pathname += '/videos';
           }
-          if (!p.split('/').find(parseFloat)) {
+          if (!parts(p).find(parseFloat)) {
             url.pathname += '/1/';
           }
           Object.entries(searchFilterParams).forEach(([key, value]) => url.searchParams.set(key, value));
@@ -1551,11 +1555,11 @@ const sites = {
         const url = new URL(node.href);
         const p = url.pathname;
         if (p.startsWith('/search/')) {
-          const parts = p.split('/');
-          const lastPart = parts.slice(-1)[0] || '';
-          const hasPage = parts.length > 5 && !!parseFloat(lastPart);
+          const ps = parts(p);
+          const lastPart = ps.slice(-1)[0] || '';
+          const hasPage = ps.length > 4 && !!parseFloat(lastPart);
           const page = hasPage ? lastPart : '';
-          const query = parts.slice(hasPage ? -2 : -1)[0] || '';
+          const query = ps.slice(hasPage ? -2 : -1)[0] || '';
           url.pathname = `/${searchPath}/${encodeURIComponent(query)}/${page}`;
           url.search = '';
           updateUrl(node, url);
@@ -1601,9 +1605,9 @@ const sites = {
           updateUrl(node, url);
           return;
         } else if (p.startsWith('/c/') && !p.includes(`q:${MIN_VIDEO_HEIGHT}P`)) {
-          const ps = p.split('/');
-          if (ps.length >= 3) {
-            url.pathname = `${ps[1]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[2]}`;
+          const ps = parts(p);
+          if (ps.length >= 2) {
+            url.pathname = `${ps[0]}/s:rating/d:${MIN_DURATION_MINS}min_more/q:${MIN_VIDEO_HEIGHT}P/${ps[1]}`;
             updateUrl(node, url);
           }
         } else if (['channels', 'pornstars', 'profiles'].find(i => p.startsWith(`/${i}/`))) {
