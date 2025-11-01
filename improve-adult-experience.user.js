@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.56
+// @version 0.57
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -136,7 +136,7 @@ const getTopNode = (document, node, x, y) => {
   }
 };
 
-const updateUrl = (node, href) => {
+const updateUrl = (node, href, newTab = false) => {
   const url = new URL(href);
   url.pathname = url.pathname.replace('//', '/');
   node.href = url;
@@ -144,7 +144,11 @@ const updateUrl = (node, href) => {
     if (!event.isTrusted) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    redirect(url);
+    if (newTab) {
+      window.open(url, '_blank');
+    } else {
+      redirect(url);
+    }
   }, true);
 };
 
@@ -730,16 +734,16 @@ const sites = {
           const url = new URL(node.href);
           const p = url.pathname;
           const params = url.searchParams;
-          const unset = !params.has('durationFrom');
-          if (unset && p.startsWith('/channels/' && !p.endsWith('/channels/'))) {
+          if (params.has('durationFrom')) return;
+          if (p.startsWith('/channels/')) {
             url.pathname += '/rating/';
             params.set('durationFrom', duration);
             updateUrl(node, url);
-          } else if (unset && p === '/videos/') {
+          } else if (p === '/videos/') {
             url.pathname = '/top-rated/';
             params.set('durationFrom', duration);
             updateUrl(node, url);
-          } else if (unset && p === '/most-viewed/month/') {
+          } else if (p === '/most-viewed/month/') {
             params.set('durationFrom', duration);
             updateUrl(node, url);
           }
@@ -1170,10 +1174,9 @@ const sites = {
 
         const href = node.href;
         if (href.includes('/video/')) {
-          node.addEventListener('click', _ => {
-            if (!event.isTrusted) return;
-            resetVideo();
-          }, true);
+          if (loc.pathname.startsWith('/playlists/')) {
+            updateUrl(node, href, true);
+          }
           return;
         }
         if (href.includes('/models/') && href.length === origin.length + '/models/a/'.length) return;
