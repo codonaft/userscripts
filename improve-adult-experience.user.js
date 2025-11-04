@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites. Designed for a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.57
+// @version 0.58
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -1340,7 +1340,8 @@ const sites = {
 
         const params = url.searchParams;
 
-        if (p.includes('/search') && !params.has('d')) {
+        if (p.includes('/search')) {
+          if (params.has('d')) return;
           Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
           updateUrl(node, url);
         } else if (p !== '/' && !p.includes('/top-rated')) {
@@ -1495,18 +1496,21 @@ const sites = {
 
   'xhamster.com': _ => {
     // TODO: <iframe src="https://xhamster.com/embed/xhHw7V9" scrolling="no" allowfullscreen="" width="640" height="480" frameborder="0"></iframe><p></p>
-    const best = 'hd/full-length/best';
+    const best = '/hd/full-length/best';
+    const quality = `${MIN_VIDEO_HEIGHT}p`;
+    const searchFilterParams = {
+      quality,
+      'min-duration': 30,
+      'length': 'full'
+    };
     init({
       searchInputSelector: 'input[name="q"][type="text"]',
-      searchFilter: query => [`search/${encodeURIComponent(query)}`, {
-        quality: `${MIN_VIDEO_HEIGHT}p`,
-        'min-duration': 30,
-        'length': 'full'
-      }],
+      searchFilter: query => [`search/${encodeURIComponent(query)}`, {}],
+      searchFilterParams,
       thumbnailSelector: 'div.video-thumb, div.thumb-list__item',
       durationSelector: 'div[data-role="video-duration"]',
       isVideoUrl: href => href.includes('/videos/'),
-      hideSelector: 'div[data-block="moments"], div[data-role="cookies-modal"]',
+      hideSelector: 'a[href^="/ff/out?"], div[data-block="moments"], div[data-role="cookies-modal"], div.dyltv-inner-container',
       onNodeChange: node => {
         if ((node.matches('span') && node.textContent.includes('Watch more')) || node.matches('div[class*="skeleton"]')) {
           node.closest('div')?.classList?.add(HIDE);
@@ -1515,17 +1519,20 @@ const sites = {
 
         if (!validLink(node)) return;
 
-        const url = new URL(node.href);
+        const url = new URL(node.href.replace(/\/hd$/, '/'));
         const params = url.searchParams;
         const p = url.pathname;
-        if (p.startsWith('/search/')) {
-          if (params.get('length') !== 'full') {
-            params.set('quality', `${MIN_VIDEO_HEIGHT}p`);
-            params.set('length', 'full');
-            updateUrl(node, url);
-          }
-        } else if (p === '/' || ['/categories/', '/channels/'].find(i => p.startsWith(i))) {
-          updateUrl(node, `${node.href.replace(/\/hd$/, '/')}/${best}/monthly?quality=${MIN_VIDEO_HEIGHT}p`);
+        if (p.startsWith('/search/') && params.get('length') !== 'full') {
+          Object.entries(searchFilterParams).forEach(([key, value]) => params.set(key, value));
+          updateUrl(node, url);
+        } else if (p === '/' || (['/categories/', '/channels/'].find(i => p.startsWith(i)) && !p.includes(best))) {
+          url.pathname += `${best}/monthly`;
+          params.set('quality', quality);
+          updateUrl(node, url);
+        } else if (parts(p).length > 1 && ['/creators/', '/pornstars/'].find(i => p.startsWith(i)) && !['/all/', best].find(i => p.includes(i))) {
+          url.pathname += best;
+          params.set('quality', quality);
+          updateUrl(node, url);
         }
       },
     });
