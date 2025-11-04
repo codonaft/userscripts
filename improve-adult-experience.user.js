@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.58
+// @version 0.59
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -36,7 +36,6 @@ const HIDE = '__hide';
 const INITIALIZED = '__initialized';
 
 let pageIsHidden = true;
-let unmuted = false;
 let initializedVideo = false;
 let playbackInitiated = false;
 let playbackStarted = false;
@@ -294,7 +293,15 @@ const init = (args = {}) => {
   };
 
   const maybeStartAutoplay = video => {
-    if (!AUTOPLAY || pageIsHidden || playbackInitiated || playbackStarted || !video || !video.paused) return;
+    if (!AUTOPLAY || playbackInitiated) return;
+
+    if (video.muted && video.matches('video')) {
+      console.log('unmute');
+      video.volume = 0.1;
+      video.muted = false;
+    }
+
+    if (pageIsHidden || playbackStarted || !video || !video.paused) return;
 
     if (video.matches(JW_PLAYER_SELECTOR)) {
       console.log('starting playback');
@@ -304,12 +311,6 @@ const init = (args = {}) => {
       } catch (e) {
         err(e, video);
       }
-    }
-
-    if (!unmuted && video.matches('video')) {
-      console.log('unmute');
-      video.muted = false;
-      unmuted = true;
     }
 
     togglePlay(video);
@@ -1236,7 +1237,7 @@ const sites = {
     });
   },
 
-  'spankbang.com': _ => { // FIXME: random position
+  'spankbang.com': _ => { // FIXME: consistently set random position
     const searchFilterParams = { d: MIN_DURATION_MINS, q: 'fhd' };
     init({
       searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
@@ -1258,7 +1259,7 @@ const sites = {
         const p = url.pathname;
         if (p === '/gifs') {
           node.classList.add(HIDE);
-        } else if (!p.endsWith('/tags') && !p.includes('/playlist/') && !p.includes('/video/') && !(params.has('q') && params.has('d'))) {
+        } else if (!p.endsWith('/tags') && !['/playlist/', '/video/'].find(i => p.includes(i)) && !(params.has('q') && params.has('d'))) {
           if (p === '/') {
             url.pathname = '/trending_videos/'
           }
