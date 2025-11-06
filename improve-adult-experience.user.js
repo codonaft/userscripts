@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.59
+// @version 0.60
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -1603,7 +1603,7 @@ const sites = {
       qualitySelector: 'span.video-hd-mark, span.video-sd-mark',
       durationSelector: 'span.duration',
       isUnwantedQuality: text => (parseFloat(text.split('p')[0]) || 0) < MIN_VIDEO_HEIGHT,
-      isUnwantedDuration: text => !text.includes('h') && parseFloat(text.split(' min')[0] || 0) < MIN_DURATION_MINS,
+      isUnwantedDuration: text => text.includes(' sec') || (!text.includes('h') && parseFloat(text.split(' min')[0] || 0) < MIN_DURATION_MINS),
       isVideoUrl: href => new URL(href).pathname.startsWith('/video.'),
       hideSelector: 'a.premium, button.comments span.badge, div[style*="color: rgb(255, 255, 255)"][style*="text-align: center"], div.banner-slider, div.p-red, div.quickies-lat, div.premium-results-line, ul.search-premium-tabs',
       nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, strong`,

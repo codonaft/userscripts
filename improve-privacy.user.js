@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.17
+// @version 0.18
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
 (_ => {
 'use strict';
 
+const h = window.location.hostname;
 const hiddenNodes = 'div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.style-scope.ytd-topbar-logo-renderer';
 const links = '[href]';
 
@@ -23,6 +24,16 @@ const cleanup = node => {
     if (!node.matches(links)) return true;
     const href = node.href;
     if (!href) return true;
+
+    if (h === 'tagpacker.com' && !node.closest?.('ul.nav')) {
+      node.addEventListener('click', _ => {
+        if (!event.isTrusted) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.location = href;
+      }, true);
+      return;
+    }
 
     const youtube = href.startsWith?.('https://www.youtube.com/watch?') || href.startsWith?.('https://youtu.be/');
     const maps = href.startsWith?.('https://maps.app.goo.gl/');
@@ -76,7 +87,6 @@ const subscribeOnChanges = (node, selector, f) => {
 
 subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {
   try {
-    const h = window.location.hostname;
     if (['youtube.com', 'youtu.be', 'google.com'].find(i => h.endsWith(i)) && node.matches(hiddenNodes)) {
       node.style.display = 'none';
       return false;
