@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.19
+// @version 0.20
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -8,7 +8,7 @@
 'use strict';
 
 const h = window.location.hostname;
-const hiddenNodes = 'div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.preference-hint, span.style-scope.ytd-topbar-logo-renderer';
+const hiddenNodes = 'div[class^="langGeoPickerIcons"] use, div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.preference-hint, span.style-scope.ytd-topbar-logo-renderer';
 const links = '[href]';
 
 const cleanup = node => {

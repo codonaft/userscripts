@@ -7,7 +7,7 @@
 // @grant GM_addStyle
 // ==/UserScript==
 
-// TODO: cumlouder.com, pornone.com, pornheed.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com
+// TODO: cumlouder.com, pornone.com, pornheed.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, youporn.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv
 
 (_ => {
 'use strict';
@@ -1519,7 +1519,7 @@ const sites = {
           return;
         }
 
-        if (!validLink(node) || node.closest('div.categories-container')) return;
+        if (!validLink(node) || node.closest('div.categories-container, div[class^="videoFilters-"]')) return;
 
         const url = new URL(node.href.replace(/\/hd$/, '/'));
         const params = url.searchParams;
