@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.60
+// @version 0.61
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -1497,7 +1497,8 @@ const sites = {
 
   'xhamster.com': _ => {
     // TODO: <iframe src="https://xhamster.com/embed/xhHw7V9" scrolling="no" allowfullscreen="" width="640" height="480" frameborder="0"></iframe><p></p>
-    const best = '/hd/full-length/best';
+    const hd = '/hd/';
+    const best = `${hd}full-length/best`;
     const quality = `${MIN_VIDEO_HEIGHT}p`;
     const searchFilterParams = {
       quality,
@@ -1511,14 +1512,14 @@ const sites = {
       thumbnailSelector: 'div.video-thumb, div.thumb-list__item',
       durationSelector: 'div[data-role="video-duration"]',
       isVideoUrl: href => href.includes('/videos/'),
-      hideSelector: 'a[href^="/ff/out?"], div[data-block="moments"], div[data-role="cookies-modal"], div.dyltv-inner-container',
+      hideSelector: 'a[href^="/ff/out?"], div.dyltv-inner-container, div[data-block="moments"], div[data-role="cookies-modal"], div[class*="skeleton"], div[data-role="contest-banner-block"]',
       onNodeChange: node => {
-        if ((node.matches('span') && node.textContent.includes('Watch more')) || node.matches('div[class*="skeleton"]')) {
+        if (node.matches('span') && node.textContent.includes('Watch more')) {
           node.closest('div')?.classList?.add(HIDE);
           return;
         }
 
-        if (!validLink(node)) return;
+        if (!validLink(node) || node.closest('div.categories-container')) return;
 
         const url = new URL(node.href.replace(/\/hd$/, '/'));
         const params = url.searchParams;
@@ -1530,7 +1531,11 @@ const sites = {
           url.pathname += `${best}/monthly`;
           params.set('quality', quality);
           updateUrl(node, url);
-        } else if (parts(p).length > 1 && ['/creators/', '/pornstars/'].find(i => p.startsWith(i)) && !['/all/', best].find(i => p.includes(i))) {
+        } else if (parts(p).length > 1 && p.startsWith('/creators/') && !['/all/', '/awards', '/contest/', '/videos/', hd].find(i => p.includes(i))) {
+          url.pathname += hd;
+          params.set('quality', quality);
+          updateUrl(node, url);
+        } else if (parts(p).length > 1 && p.startsWith('/pornstars/') && !['/all/', best].find(i => p.includes(i))) {
           url.pathname += best;
           params.set('quality', quality);
           updateUrl(node, url);

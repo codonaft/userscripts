@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.18
+// @version 0.19
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -8,7 +8,7 @@
 'use strict';
 
 const h = window.location.hostname;
-const hiddenNodes = 'div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.style-scope.ytd-topbar-logo-renderer';
+const hiddenNodes = 'div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.preference-hint, span.style-scope.ytd-topbar-logo-renderer';
 const links = '[href]';
 
 const cleanup = node => {
@@ -87,7 +87,7 @@ const subscribeOnChanges = (node, selector, f) => {
 
 subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {
   try {
-    if (['youtube.com', 'youtu.be', 'google.com'].find(i => h.endsWith(i)) && node.matches(hiddenNodes)) {
+    if (['youtube.com', 'youtu.be', 'google.com', 'xhamster.com'].find(i => h.endsWith(i)) && node.matches(hiddenNodes)) {
       node.style.display = 'none';
       return false;
     }
