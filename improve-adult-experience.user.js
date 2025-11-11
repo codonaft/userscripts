@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.62
+// @version 0.63
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -210,6 +210,7 @@ const init = (args = {}) => {
     isVideoUrl,
     hideSelector,
     nodeChangeSelector,
+    onStartPlayback,
     onNodeChange,
   } = { ...defaultArgs, ...args };
 
@@ -237,6 +238,7 @@ const init = (args = {}) => {
       const strategies = [
         _ => button?.click(),
         _ => simulateMouse(document, video),
+        _ => video.play?.(),
       ];
 
       let attempt = 0;
@@ -466,6 +468,7 @@ const init = (args = {}) => {
       console.log('playback is started')
       playbackStarted = true;
       focus(video);
+      onStartPlayback(video);
     }, { once: true });
 
     video.addEventListener('stalled', _ => {
@@ -1253,6 +1256,13 @@ const sites = {
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper',
+      onStartPlayback: video => {
+        body.querySelector('button.vjs-control[title="Unmute"]')?.click();
+        // FIXME
+        //if ([...body.querySelectorAll('div#video_container, .play_cover.loading')].find(i => i.style?.display === 'block')) return;
+        //console.log('fixing invisible player');
+        //simulateMouse(document, video);
+      },
       onNodeChange: node => {
         if (!validLink(node)) return;
 
@@ -1499,6 +1509,7 @@ const sites = {
 
   'xhamster.com': _ => {
     // TODO: <iframe src="https://xhamster.com/embed/xhHw7V9" scrolling="no" allowfullscreen="" width="640" height="480" frameborder="0"></iframe><p></p>
+    const qualityKey = 'quality';
     const hd = '/hd/';
     const best = `${hd}full-length/best`;
     const quality = `${MIN_VIDEO_HEIGHT}p`;
@@ -1526,20 +1537,22 @@ const sites = {
         const url = new URL(node.href.replace(/\/hd$/, '/'));
         const params = url.searchParams;
         const p = url.pathname;
+        if (params.has(qualityKey)) return;
+
         if (p.startsWith('/search/') && params.get('length') !== 'full') {
           applySearchFilter(searchFilterParams, url);
           updateUrl(node, url);
         } else if (p === '/' || (['/categories/', '/channels/'].find(i => p.startsWith(i)) && !p.includes(best))) {
           url.pathname += `${best}/monthly`;
-          params.set('quality', quality);
+          params.set(qualityKey, quality);
           updateUrl(node, url);
         } else if (parts(p).length > 1 && p.startsWith('/creators/') && !['/all/', '/awards', '/contest/', '/videos/', hd].find(i => p.includes(i))) {
           url.pathname += hd;
-          params.set('quality', quality);
+          params.set(qualityKey, quality);
           updateUrl(node, url);
         } else if (parts(p).length > 1 && p.startsWith('/pornstars/') && !['/all/', best].find(i => p.includes(i))) {
           url.pathname += best;
-          params.set('quality', quality);
+          params.set(qualityKey, quality);
           updateUrl(node, url);
         }
       },
