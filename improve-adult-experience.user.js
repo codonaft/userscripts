@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, pornone.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.63
+// @version 0.64
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -70,6 +70,7 @@ const parts = pathname => pathname.split('/').filter(i => i.length > 0);
 const FLUID_PLAYER = '#fluid_video_wrapper_player, div.fluid_button';
 const JW_PLAYER_SELECTOR = 'video.jw-video, video.js-player';
 const KT_PLAYER_SELECTOR = 'div#kt_player';
+const VJS_PLAYER_SELECTOR = 'video.vjs-tech[id*="player_html5_api"]';
 
 const err = (e, node) => {
   console.log(node);
@@ -187,7 +188,7 @@ const defaultArgs = {
   searchFilterParams: {},
   videoSelector: 'video',
   isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
-  nodeChangeSelector: 'a, div, input, li, span, video',
+  nodeChangeSelector: 'a, button, div, input, li, span, video',
 };
 
 const init = (args = {}) => {
@@ -210,7 +211,7 @@ const init = (args = {}) => {
     isVideoUrl,
     hideSelector,
     nodeChangeSelector,
-    onStartPlayback,
+    onPlaybackStart,
     onNodeChange,
   } = { ...defaultArgs, ...args };
 
@@ -343,6 +344,12 @@ const init = (args = {}) => {
         console.log('detected kt player');
         playSelector = 'a.fp-play';
         fullscreenSelector = 'a.fp-fullscreen';
+      } else if (body.querySelector(VJS_PLAYER_SELECTOR)) {
+        console.log('detected vjs player');
+        playSelector = 'span.i-play#play-button, button.vjs-big-play-button, button.vjs-play-control[title="Play"]';
+        pauseSelector = 'button.vjs-play-control[title="Pause"]';
+        fullscreenSelector = 'button.vjs-fullscreen-control';
+        videoSelector = VJS_PLAYER_SELECTOR;
       }
     }
 
@@ -468,7 +475,10 @@ const init = (args = {}) => {
       console.log('playback is started')
       playbackStarted = true;
       focus(video);
-      onStartPlayback(video);
+      setTimeout(_ => {
+        console.log('onPlaybackStart');
+        onPlaybackStart?.(video)
+      }, 700);
     }, { once: true });
 
     video.addEventListener('stalled', _ => {
@@ -1157,6 +1167,37 @@ const sites = {
     }
   },
 
+  'pornone.com': _ => {
+    const filter = 'rating/hd/';
+    const isVideoUrl = href => {
+      const p = new URL(href).pathname;
+      return !p.startsWith('/channel/') && !Number.isNaN(parseFloat(parts(p).slice(-1)));
+    };
+    init({
+      searchInputSelector: 'input[type="text"][name="q"]',
+      searchFilter: query => [`search/${filter}`, { q: query }],
+      thumbnailSelector: 'a.videocard',
+      qualitySelector: 'span.durlabel img[alt="HD Video"]',
+      durationSelector: 'span.durlabel',
+      isUnwantedQuality: text => text === undefined,
+      isVideoUrl,
+      onPlaybackStart: video => {
+        video.click();
+        video.click();
+      },
+      onNodeChange: node => {
+        if (!validLink(node) || node.classList.contains('hidden') || node.rel === 'nofollow' || node.closest('div.gandermenu, footer')) return;
+
+        const url = new URL(node.href);
+        const p = url.pathname;
+        if (!isVideoUrl(node.href) && !p.includes(filter)) {
+          url.pathname += filter;
+          updateUrl(node, url);
+        }
+      },
+    });
+  },
+
   'porntrex.com': _ => {
     const minDuration = 'thirty-all-min';
     const topRated = 'top-rated';
@@ -1248,20 +1289,17 @@ const sites = {
       searchInputSelector: 'input#search-input[type="text"], input[type="text"][aria-label="Search porn videos"]',
       searchFilter: query => [`s/${encodeURIComponent(query)}/`, {}],
       searchFilterParams,
-      playSelector: 'span.i-play#play-button, button.vjs-play-control[title="Play"]',
-      pauseSelector: 'button.vjs-play-control[title="Pause"]',
-      fullscreenSelector: 'button.vjs-fullscreen-control',
-      videoSelector: 'video#main_video_player_html5_api',
       thumbnailSelector: 'div[data-testid="video-item"]',
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper',
-      onStartPlayback: video => {
+      onPlaybackStart: video => {
         body.querySelector('button.vjs-control[title="Unmute"]')?.click();
-        // FIXME
-        //if ([...body.querySelectorAll('div#video_container, .play_cover.loading')].find(i => i.style?.display === 'block')) return;
-        //console.log('fixing invisible player');
-        //simulateMouse(document, video);
+        const cover = body.querySelector('div.play_cover');
+        if (cover?.style?.cursor === 'pointer') {
+          console.log('fixing invisible player');
+          cover.click();
+        }
       },
       onNodeChange: node => {
         if (!validLink(node)) return;
