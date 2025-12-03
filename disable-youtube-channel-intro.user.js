@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.10
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
 // @match https://www.youtube.com/@*
 // @match https://www.youtube.com/channel/*
@@ -40,7 +40,7 @@ const subscribeOnChanges = (node, selector, f) => {
   node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
-subscribeOnChanges(document.body, 'button.ytp-play-button[data-title-no-tooltip="Pause"]', (node, observer) => {
+subscribeOnChanges(document.body, 'div#c4-player video, button.ytp-play-button[data-title-no-tooltip="Pause"]', (node, observer) => {
   observer.disconnect();
   node.click();
 
