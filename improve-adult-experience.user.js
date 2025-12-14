@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, pornone.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.66
+// @version 0.67
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -410,7 +410,7 @@ const init = (args = {}) => {
       if (unwanted) {
         const thumbnail = node.closest(thumbnailSelector);
         const thumbnails = thumbnail?.parentNode?.querySelectorAll(thumbnailSelector);
-        if (thumbnails?.length > 0 && thumbnails?.length <= 2) {
+        if (thumbnails?.length > 0 && thumbnails?.length <= 3) {
           // xvideos
           thumbnails?.forEach(i => i.classList.add(UNWANTED));
         } else {
@@ -1565,7 +1565,7 @@ const sites = {
       isVideoUrl: href => href.includes('/videos/'),
       hideSelector: 'a[href*="/ff/out?"], div.dyltv-inner-container, div[data-block="moments"], div[data-role="cookies-modal"], div[class*="skeleton"], div[data-role="contest-banner-block"]',
       onNodeChange: node => {
-        if (node.matches('span') && node.textContent.includes('Watch more')) {
+        if ((node.matches('span') && node.textContent.includes('Watch more')) || (node.matches('div.thumb-plug') && node.textContent.includes('Not available'))) {
           node.closest('div')?.classList?.add(HIDE);
           return;
         }
