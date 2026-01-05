@@ -1293,7 +1293,7 @@ const sites = {
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
       isVideoUrl: href => href.includes('/video/'),
       hideSelector: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper',
-      onPlaybackStart: video => {
+      onPlaybackStart: _ => {
         body.querySelector('button.vjs-control[title="Unmute"]')?.click();
         const cover = body.querySelector('div.play_cover');
         if (cover?.style?.cursor === 'pointer') {
