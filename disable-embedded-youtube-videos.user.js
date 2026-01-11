@@ -1,21 +1,21 @@
 // ==UserScript==
 // @name Disable Embedded YouTube Videos
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/disable-embedded-youtube-videos.user.js
 // ==/UserScript==
 
 (_ => {
 'use strict';
 
-const PROXY = 'https://wsrv.nl/?url=';
-// const PROXY = 'https://imgproxy.nosotros.app/_/feed_img/plain/';
+const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+const pickRandom = xs => xs[random(0, xs.length - 1)];
 
-if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
+const PROXY = pickRandom(['imgproxy.nosotros.app/_/feed_img/plain/', 'wsrv.nl/?url=']);
 
 const imageURL = url => {
   if (!PROXY) return url;
-  return `${PROXY}${encodeURIComponent(url)}`;
+  return `https://${PROXY}${encodeURIComponent(url)}`;
 };
 
 const subscribeOnChanges = (node, selector, f) => {
