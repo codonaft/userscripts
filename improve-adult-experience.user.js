@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornhits.com, pornhub.com, porno365.best, pornone.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.68
+// @version 0.69
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -884,17 +884,15 @@ const sites = {
 
   'pmvhaven.com': _ => {
     const isVideoUrl = href => href.includes('/video/');
-    let sortDetected = false;
-    const clicked = new Set;
     init({
       searchInputSelector: 'input[type="text"]',
-      searchFilter: query => [`search/${encodeURIComponent(query)}`, {}],
+      searchFilter: q => ['search', { q }],
       videoSelector: 'video#VideoPlayer',
       thumbnailSelector: 'a[href*="/video/"]',
-      qualitySelector: 'p',
-      durationSelector: 'p',
+      qualitySelector: 'div:not([title^="Aspect ratio:"]):not(.aspect-video)',
+      durationSelector: 'div:not([title^="Aspect ratio:"]):not(.aspect-video)',
       isUnwantedDuration: text => text.includes(':') && timeToSeconds(text) < MIN_DURATION_MINS * 60,
-      isUnwantedQuality: text => text.endsWith('p') && parseFloat(text.split('p')[0]) < MIN_VIDEO_HEIGHT,
+      isUnwantedQuality: text => (text.includes('HD') && !text.includes('FHD')) || text.includes('SD'),
       isVideoUrl,
       hideSelector: '.v-badge',
       nodeChangeSelector: `${defaultArgs.nodeChangeSelector}, button[aria-haspopup="menu"], p`,
@@ -903,19 +901,7 @@ const sites = {
           updateUrl(node, node.href);
           return;
         }
-
-        if (!sortDetected && node.matches('button.filter-btn') && ['Newest', 'Relevance'].includes(node.textContent.trim())) {
-          sortDetected = true;
-          node.click();
-          setTimeout(_ => [...body.querySelectorAll('button.filter-btn')].find(i => i.textContent.trim() === 'Quality')?.click(), 1000);
-        }
-
-        if (node.matches('div.v-list-item-title')) {
-          const content = node.textContent.trim();
-          if (clicked.has(content) || !['1080p', 'Longest'].includes(content)) return;
-          clicked.add(content);
-          node.click();
-        }
+        // TODO: set filters
       },
     });
   },
