@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.70
+// @version 0.71
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -902,6 +902,24 @@ const sites = {
           return;
         }
         // TODO: set filters
+      },
+    });
+  },
+
+  'pmvtube.com': _ => {
+    init({
+      searchInputSelector: 'input#s[type="text"], input[type="text"][name="s"]',
+      searchFilter: query => ['search', { s: query, filter: 'longest' }],
+      videoSelector: 'div.video-player',
+      thumbnailSelector: 'article.thumb-block',
+      durationSelector: 'span.duration',
+      isUnwantedDuration: text => text.includes(':') && timeToSeconds(text) < MIN_DURATION_MINS * 60,
+      onNodeChange: node => {
+        if (!validLink(node)) return;
+
+        const url = new URL(node.href);
+        url.searchParams.set('filter', 'longest');
+        updateUrl(node, url);
       },
     });
   },
