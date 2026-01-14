@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.11
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
-// @match https://www.youtube.com/@*
-// @match https://www.youtube.com/channel/*
+// @exclude https://www.youtube.com/watch?*
+// @match https://www.youtube.com/*
 // ==/UserScript==
 
 (_ => {
@@ -57,7 +57,7 @@ subscribeOnChanges(document.body, 'div#c4-player video, button.ytp-play-button[d
     link.href = `https://www.youtube.com/watch?v=${videoId}`;
     link.appendChild(image);
 
-    div?.parentNode.replaceChild(link, div);
+    div?.parentNode?.replaceChild(link, div);
   }
 
   return false;
