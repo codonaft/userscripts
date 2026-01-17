@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.20
+// @version 0.21
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // ==/UserScript==
 
@@ -25,6 +25,12 @@ const cleanup = node => {
     const href = node.href;
     if (!href) return true;
 
+    const url = new URL(href);
+    [...url.searchParams.keys()]
+      .filter(k => k.startsWith('utm_'))
+      .forEach(k => url.searchParams.delete(k));
+    maybeUpdateUrl(node, url, href);
+
     if (h === 'tagpacker.com' && !node.closest?.('ul.nav')) {
       node.addEventListener('click', _ => {
         if (!event.isTrusted) return;
@@ -39,22 +45,25 @@ const cleanup = node => {
     const maps = href.startsWith?.('https://maps.app.goo.gl/');
     if (!youtube && !maps) return true;
 
-    const url = new URL(href);
     [...url.searchParams.keys()]
       .filter(k => maps || !['index', 'list', 't', 'v'].includes(k))
       .forEach(k => url.searchParams.delete(k));
 
-    const newHref = url.toString();
-    if (newHref !== href) {
-      node.href = newHref;
-      if (node.textContent?.trim() === href) {
-        node.innerHTML = newHref;
-      }
-    }
+    maybeUpdateUrl(node, url, href);
   } catch (e) {
     err(e, node);
   }
   return true;
+};
+
+const maybeUpdateUrl = (node, url, href) => {
+  const newHref = url.toString();
+  if (newHref !== href) {
+    node.href = newHref;
+    if (node.textContent?.trim() === href) {
+      node.innerHTML = newHref;
+    }
+  }
 };
 
 const subscribeOnChanges = (node, selector, f) => {
