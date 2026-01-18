@@ -2,8 +2,9 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.72
+// @version 0.73
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // @grant GM_addStyle
 // ==/UserScript==
 
@@ -72,14 +73,7 @@ const JW_PLAYER_SELECTOR = 'video.jw-video, video.js-player';
 const KT_PLAYER_SELECTOR = 'div#kt_player';
 const VJS_PLAYER_SELECTOR = 'video.vjs-tech[id*="player_html5_api"]';
 
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
-};
-
 const currentTime = _ => Math.round(Date.now() / 1000);
-const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const pickRandom = xs => xs[random(0, xs.length - 1)];
 
 const TIME_PATTERN = /(\d+(?:\.\d+)?)([hms])/g;
 const MINUTE = 60;
@@ -152,34 +146,6 @@ const updateUrl = (node, href, newTab = false) => {
       redirect(url);
     }
   }, true);
-};
-
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 const defaultArgs = {

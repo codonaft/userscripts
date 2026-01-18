@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name Bypass YouTube Popups
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.8
+// @version 0.9
 // @downloadURL https://userscripts.codonaft.com/bypass-youtube-popups.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // @match https://www.youtube.com/*
 // ==/UserScript==
 
@@ -11,11 +12,7 @@
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
 
-const randomPause = _ => {
-  const min = 3000;
-  const max = 5000;
-  return Math.floor(Math.random() * (max - min + 1) + min);
-};
+const randomPause = _ => random(3000, 5000);
 
 const process = (node, observer) => {
   if (node.classList.contains('yt-spec-button-shape-next')) {
@@ -46,39 +43,6 @@ const process = (node, observer) => {
   }
 
   return true;
-};
-
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
-};
-
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
 };
 
 subscribeOnChanges(document.body, 'button, div, span', process);

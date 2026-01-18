@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name Clean Jitsi in Tile Mode for Podcasting
 // @icon https://external-content.duckduckgo.com/ip3/jitsi.org.ico
-// @version 0.14
+// @version 0.15
 // @downloadURL https://userscripts.codonaft.com/jitsi-podcaster.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
 
 (_ => {
@@ -17,39 +18,6 @@ const hiddenNodes = 'a.watermark.leftwatermark[href="https://jitsi.org"], div.au
 const someHiddenNodes = 'span.videocontainer';
 
 const hide = node => node.style.display = 'none';
-
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
-};
-
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
-};
 
 subscribeOnChanges(b, `${hiddenNodes}, ${someHiddenNodes}`, (node, _observer) => {
   if (node.matches(hiddenNodes)) {

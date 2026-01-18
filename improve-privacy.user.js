@@ -1,8 +1,11 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.21
+// @version 0.22
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
+
+// TODO: https://github.com/f321x/nostr-tracking-token-remover/tree/main/nostr_tracking_token_remover/rulesets
 
 (_ => {
 'use strict';
@@ -66,34 +69,6 @@ const maybeUpdateUrl = (node, url, href) => {
   }
 };
 
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
-};
-
 subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {
   try {
     if (['youtube.com', 'youtu.be', 'google.com', 'xhamster.com'].find(i => h.endsWith(i)) && node.matches(hiddenNodes)) {
@@ -106,9 +81,4 @@ subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) 
 
   return cleanup(node);
 });
-
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
-};
 })();

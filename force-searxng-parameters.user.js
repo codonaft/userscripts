@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.18
+// @version 0.19
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
 
 (_ => {
@@ -57,8 +58,6 @@ const params = {
   ...Object.fromEntries(Array.from(hashParams.entries())), // NOTE: fails on Firefox without Array.from
 };
 
-const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const pickRandom = xs => xs[random(0, xs.length - 1)];
 const enginesCookie = (engines, excluded) => Object
   .entries(engines)
   .flatMap(([category, v]) => v.filter(i => !excluded.includes(i))
@@ -122,34 +121,7 @@ if (!params.autocomplete) {
   }
 }
 
-/*const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
-};
-
+/*
 subscribeOnChanges(b, 'div#results div.engines span', (node, observer) => {
   if (disabledEnginesSet.has(node.textContent)) {
     console.warn('unexpected engine, press the search button to retry');
@@ -159,9 +131,5 @@ subscribeOnChanges(b, 'div#results div.engines span', (node, observer) => {
   }
   return true;
 });
-
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
-};*/
+*/
 })();

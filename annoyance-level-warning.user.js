@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name Label the links with CAPTCHA/PoW annoyance
 // @description Helps to prefer visiting sites that aren't associated with the irrational businesses that keep "fighting" the spammy traffic by disrupting the UX with cringe challenges (rather than transforming the traffic into useful (UPoW) and profitable computations) as well as sites with PoW-based DDoS-protection pages (useless anti-ecological computations).
-// @version 0.4
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/annoyance-level-warning.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // @grant GM.getValue
 // @grant GM.xmlHttpRequest
 // @grant GM_addStyle
@@ -98,11 +99,6 @@ const addCompany = async (ip, company) => {
   GM_setValue(IP_TO_COMPANY_KEY, records);
 };
 
-const err = (e, data) => {
-  console.log(data);
-  console.error(e);
-};
-
 const setWarning = (node, level) => {
   if ([LEVEL_UNKNOWN, LEVEL_OK].includes(level)) return;
 
@@ -131,9 +127,6 @@ const resolveCompany = async (ip, hostname) => {
   await addCompany(ip, company);
   return company;
 };
-
-const random = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
-const pickRandom = xs => xs[random(0, xs.length - 1)];
 
 const enqueuedChecks = new Set;
 const check = async hostname => {
@@ -175,34 +168,6 @@ const check = async hostname => {
     await removeRecord(hostname);
     err(e, hostname);
   }
-};
-
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
 };
 
 await loadRecords();

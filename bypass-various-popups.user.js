@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.18
+// @version 0.19
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // @match https://*.archive.org/*
 // @match https://*.pornhub.com/*
 // @match https://chat.deepseek.com/*
@@ -21,8 +22,6 @@
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
-
-const randomPause = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
 
 const simulateMouse = (document, node, events = ['mouseenter', 'mouseover', 'mousemove', 'mousedown', 'mouseup', 'click']) => {
   if (!node) return;
@@ -64,7 +63,7 @@ const process = (node, observer) => {
           i.click();
         }
       });
-    }, randomPause(1000, 1500));
+    }, random(1000, 1500));
     observer.disconnect();
     return false;
   }
@@ -87,7 +86,7 @@ const process = (node, observer) => {
   }
 
   if (node.tagName === 'BUTTON' && (node.getAttribute('data-role') === 'parental-control-confirm-button' || node.textContent?.includes('Stay logged out'))) {
-    setTimeout(_ => node.click(), randomPause(1000, 1500));
+    setTimeout(_ => node.click(), random(1000, 1500));
     return false;
   }
 
@@ -127,39 +126,6 @@ const process = (node, observer) => {
   }
 
   return true;
-};
-
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
-};
-
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
 };
 
 subscribeOnChanges(document.body, 'button, div, span', process);

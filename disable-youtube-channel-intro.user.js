@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.12
+// @version 0.13
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
+// @require https://userscripts.codonaft.com/utils.js
 // @exclude https://www.youtube.com/watch?*
 // @match https://www.youtube.com/*
 // ==/UserScript==
@@ -11,34 +12,6 @@
 'use strict';
 
 if (performance.getEntriesByType('navigation')[0]?.responseStatus !== 200) return;
-
-const subscribeOnChanges = (node, selector, f) => {
-  const apply = (node, observer) => {
-    if (node?.nodeType !== 1) return;
-
-    let observeChildren = true;
-    if (node?.matches?.(selector)) {
-      try {
-        observeChildren = f(node, observer);
-      } catch (e) {
-        err(e, node);
-        if (e.name === 'SecurityError') {
-          observer.disconnect();
-          return;
-        }
-      }
-    }
-
-    if (observeChildren) {
-      const children = node?.childNodes || [];
-      children.forEach(i => apply(i, observer));
-    }
-  };
-
-  const observer = new MutationObserver(mutations => mutations.forEach(m => m.addedNodes.forEach(i => apply(i, observer))));
-  observer.observe(node, { childList: true, subtree: true });
-  node.querySelectorAll(selector).forEach(i => apply(i, observer));
-};
 
 subscribeOnChanges(document.body, 'div#c4-player video, button.ytp-play-button[data-title-no-tooltip="Pause"]', (node, observer) => {
   observer.disconnect();
@@ -62,9 +35,4 @@ subscribeOnChanges(document.body, 'div#c4-player video, button.ytp-play-button[d
 
   return false;
 });
-
-const err = (e, node) => {
-  console.log(node);
-  console.error(e);
-};
 })();
