@@ -18,6 +18,7 @@ const QUEUE_LIMIT = 128;
 const RECORD_KEY = 'annoyanceLevelWarning';
 const IP_TO_COMPANY_KEY = `${RECORD_KEY}IpToCompany`;
 
+// FIXME: don't leak local IPs
 // https://github.com/curl/curl/wiki/DNS-over-HTTPS#publicly-available-servers
 const DOH_HOSTS = ['3dns.eu/dns-query', 'arashi.net.eu.org/dns-query', 'dns.belnet.be/dns-query', 'dns.blokada.org/dns-query', 'dns.csswg.org/dns-query', 'dns.dnsguard.pub/dns-query', 'dns.dnsguard.pub/dns-query', 'dns.elemental.software/dns-query', 'dns.girino.org/dns-query', 'dns.glf.wtf/dns-query', 'dns.mzjtechnology.com/dns-query', 'dns.nextdns.io/resolve', 'dns.novg.net/dns-query', 'dns.startupstack.tech/dns-query', 'dns.stirringphoto.com/dns-query', 'dns.svoi.dev/dns-query', 'dns.tls-data.de/dns-query', 'dns.w3ctag.org/dns-query', 'dns4eu.online/dns-query', 'doh.li/dns-query', 'doh.seby.io/dns-query', 'dukun.de/dns-query', 'masters-of-cloud.de/dns-query', 'ns.net.kg/dns-query'];
 

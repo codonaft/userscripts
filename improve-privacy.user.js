@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.23
+// @version 0.24
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -30,7 +30,7 @@ const cleanup = node => {
 
     const url = new URL(href);
     [...url.searchParams.keys()]
-      .filter(k => k.startsWith('utm_') || k === 'notification_referrer_id')
+      .filter(k => k.startsWith('utm_') || k === 'notification_referrer_id' || k === 'redir_token')
       .forEach(k => url.searchParams.delete(k));
     maybeUpdateUrl(node, url, href);
 
