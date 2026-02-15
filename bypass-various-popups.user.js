@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.20
+// @version 0.21
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @match https://*.archive.org/*
@@ -14,10 +14,13 @@
 // @match https://manysex.com/*
 // @match https://pmvhaven.com/*
 // @match https://pornone.com/*
+// @match https://spankbang.com/*
 // @match https://txxx.com/*
+// @match https://vxxx.com/*
 // @match https://www.cvedetails.com/*
 // @match https://www.porntrex.com/*
 // @match https://www.redtube.com/*
+// @match https://www.tube8.com/*
 // @match https://www.whoreshub.com/*
 // @match https://www.xnxx.com/*
 // @match https://www.xvideos.com/*
@@ -101,6 +104,18 @@ const process = (node, observer) => {
     node.click();
     return false;
   }*/
+
+  if (node.matches('div#ageDisclaimerWrapper button#accessButton')) {
+    observer.disconnect();
+    node.click();
+    return false;
+  }
+
+  if (node.matches('button#age-check-yes')) {
+    observer.disconnect();
+    node.click();
+    return false;
+  }
 
   if (node.tagName === 'SPAN' && node.parentElement?.tagName === 'BUTTON' && node.textContent?.includes('Continue without disabling')) {
     observer.disconnect();
