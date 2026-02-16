@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.25
+// @version 0.26
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @match https://*.archive.org/*
 // @match https://*.pornhub.com/*
+// @match https://*.pussthecat.org/*
 // @match https://chat.deepseek.com/*
 // @match https://chat.qwen.ai/*
 // @match https://chatgpt.com/*
@@ -144,7 +145,7 @@ const process = (node, observer) => {
     return false;
   }
 
-  if (node.matches('#cookieconsentwarningcontainer, #donate_banner')) {
+  if (node.matches('#cookieconsentwarningcontainer, #donate_banner, div#banner')) {
     observer.disconnect();
     node.parentNode?.removeChild(node);
     return false;

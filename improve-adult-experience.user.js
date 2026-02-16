@@ -2,13 +2,13 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.78
+// @version 0.79
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @grant GM_addStyle
 // ==/UserScript==
 
-// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv
+// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, anal.media, pornoclown.top / pornoclown.com
 
 (_ => {
 'use strict';
@@ -155,6 +155,7 @@ const defaultArgs = {
   videoSelector: 'video',
   isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
   nodeChangeSelector: 'a, button, div, input, li, span, video',
+  // TODO: isVideoUrl: true if there's more than one video and none of them have significant size difference
 };
 
 const init = (args = {}) => {
@@ -319,7 +320,8 @@ const init = (args = {}) => {
       }
     }
 
-    const ad = node.matches('.jw-hardlink-inner') && node.textContent?.trim?.()?.toLowerCase?.()?.includes?.('unlock');
+    const adText = node.textContent?.trim?.()?.toLowerCase?.();
+    const ad = node.matches('.jw-hardlink-inner') && (adText?.includes?.('full video') || adText?.includes?.('unlock'));
     if (ad || node.matches(hideSelector) || (HIDE_EXTERNAL_LINKS && node.tagName === 'A' && node.href.length > 0 && !validLink(node))) {
       node.classList.add(HIDE);
       return false;
