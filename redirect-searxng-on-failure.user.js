@@ -2,7 +2,7 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result, improve instance selection with local statistics
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.14
+// @version 0.18
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // @grant GM.getValue
 // @grant GM_setValue

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Force SearXNG Parameters
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.19
+// @version 0.23
 // @downloadURL https://userscripts.codonaft.com/force-searxng-parameters.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==

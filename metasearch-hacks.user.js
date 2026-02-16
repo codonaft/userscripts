@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.7
+// @version 0.11
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
 // @grant GM_addStyle
 // ==/UserScript==

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.21
+// @version 0.25
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @match https://*.archive.org/*

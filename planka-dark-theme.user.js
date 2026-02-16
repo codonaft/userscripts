@@ -2,7 +2,7 @@
 // @name Dark Theme for Planka
 // @description Redirect to a random SearXNG instance in case of error and empty result
 // @icon https://external-content.duckduckgo.com/ip3/planka.cloud.ico
-// @version 0.2
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/planka-dark-theme.user.js
 // @grant GM_addStyle
 // ==/UserScript==
