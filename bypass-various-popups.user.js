@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.26
+// @version 0.27
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @match https://*.archive.org/*
@@ -97,14 +97,12 @@ const process = (node, observer) => {
     return false;
   }
 
-  /*
-  // FIXME redtube
   if (node.matches('div.age_disclaimer_window a#btn_agree') && node.textContent?.includes(' am 18 or older ')) {
     console.log('detected', node);
     observer.disconnect();
-    node.click();
+    setTimeout(_ => simulateMouse(document, node), random(900, 1200));
     return false;
-  }*/
+  }
 
   if (node.matches('div#ageDisclaimerWrapper button#accessButton')) {
     observer.disconnect();
@@ -171,5 +169,5 @@ const process = (node, observer) => {
   return true;
 };
 
-subscribeOnChanges(document.body, 'button, div, span', process);
+subscribeOnChanges(document.body, 'a, button, div, span', process);
 })();

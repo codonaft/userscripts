@@ -2,13 +2,13 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.79
+// @version 0.80
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @grant GM_addStyle
 // ==/UserScript==
 
-// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, anal.media, pornoclown.top / pornoclown.com
+// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com
 
 (_ => {
 'use strict';
@@ -71,7 +71,7 @@ const parts = pathname => pathname.split('/').filter(i => i.length > 0);
 const FLUID_PLAYER = '#fluid_video_wrapper_player, div.fluid_button';
 const JW_PLAYER_SELECTOR = 'video.jw-video, video.js-player';
 const KT_PLAYER_SELECTOR = 'div#kt_player';
-const VJS_PLAYER_SELECTOR = 'video.vjs-tech[id*="player_html5_api"]';
+const VJS_PLAYER_SELECTOR = 'video.vjs-tech[id*="player_html5_api"], video.vjs-tech[id*="video-player"]';
 
 const currentTime = _ => Math.round(Date.now() / 1000);
 
@@ -155,6 +155,7 @@ const defaultArgs = {
   videoSelector: 'video',
   isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
   nodeChangeSelector: 'a, button, div, input, li, span, video',
+  refreshOnStalled: true,
   // TODO: isVideoUrl: true if there's more than one video and none of them have significant size difference
 };
 
@@ -178,6 +179,7 @@ const init = (args = {}) => {
     isVideoUrl,
     hideSelector,
     nodeChangeSelector,
+    refreshOnStalled,
     onPlaybackStart,
     onNodeChange,
   } = { ...defaultArgs, ...args };
@@ -449,10 +451,12 @@ const init = (args = {}) => {
       }, 700);
     }, { once: true });
 
-    video.addEventListener('stalled', _ => {
-      console.log('stalled');
-      refresh();
-    }, { once: true });
+    if (refreshOnStalled) {
+      video.addEventListener('stalled', _ => {
+        console.log('stalled');
+        refresh();
+      }, { once: true });
+    }
 
     const mouseMove = event => {
       if (!event.isTrusted) return;
@@ -563,6 +567,15 @@ const sites = {
 
   '1porno365.info': p365,
   'porno365.best': p365,
+
+  'anal.media': _ => {
+    init({
+      thumbnailSelector: 'div.thumb',
+      durationSelector: 'div.video-info',
+      isVideoUrl: href => href.includes('/video/'),
+      refreshOnStalled: false,
+    });
+  },
 
   'anysex.com': _ => {
     const searchFilterParams = { sort: 'top' };
