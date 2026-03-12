@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Bypass Various Popups
-// @version 0.27
+// @version 0.28
 // @downloadURL https://userscripts.codonaft.com/bypass-various-popups.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @match https://*.archive.org/*
@@ -14,6 +14,7 @@
 // @match https://inporn.com/*
 // @match https://manysex.com/*
 // @match https://pmvhaven.com/*
+// @match https://pornmate.com/*
 // @match https://pornone.com/*
 // @match https://spankbang.com/*
 // @match https://txxx.com/*
@@ -79,6 +80,12 @@ const process = (node, observer) => {
     return false;
   }
 
+  if (node.matches('button.btn-confirm') && node.textContent?.includes(' AM OVER 18')) {
+    observer.disconnect();
+    node.click();
+    return false;
+  }
+
   if (node.matches('div.age-popup-btns > div#okButton') && node.textContent?.includes('18 or older')) {
     observer.disconnect();
     node.click();
@@ -98,7 +105,6 @@ const process = (node, observer) => {
   }
 
   if (node.matches('div.age_disclaimer_window a#btn_agree') && node.textContent?.includes(' am 18 or older ')) {
-    console.log('detected', node);
     observer.disconnect();
     setTimeout(_ => simulateMouse(document, node), random(900, 1200));
     return false;
