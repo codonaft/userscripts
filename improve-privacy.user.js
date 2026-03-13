@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.24
+// @version 0.25
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -9,6 +9,13 @@
 
 (_ => {
 'use strict';
+
+const PROXY = pickRandom(['imgproxy.nostu.be/insecure/f:webp/rs:fill::360/plain/', 'imgproxy.nosotros.app/_/feed_img/plain/', 'wsrv.nl/?url=']);
+
+const imageURL = url => {
+  if (!PROXY) return url;
+  return `https://${PROXY}${encodeURIComponent(url)}`;
+};
 
 const h = window.location.hostname;
 const hiddenNodes = 'div[class^="langGeoPickerIcons"] use, div[role="contentinfo"], div#gws-output-pages-elements-homepage_additional_languages__als, div#voice-search-button, span.preference-hint, span.style-scope.ytd-topbar-logo-renderer';
@@ -69,8 +76,12 @@ const maybeUpdateUrl = (node, url, href) => {
   }
 };
 
-subscribeOnChanges(document.body, `${links}, ${hiddenNodes}`, (node, _observer) => {
+subscribeOnChanges(document.body, `img, ${links}, ${hiddenNodes}`, (node, _observer) => {
   try {
+    if (node.matches('img[href^="https://i.ytimg.com/"]')) {
+      node.href = imageURL(node.href);
+      return false;
+    }
     if (['youtube.com', 'youtu.be', 'google.com', 'xhamster.com'].find(i => h.endsWith(i)) && node.matches(hiddenNodes)) {
       node.style.display = 'none';
       return false;
