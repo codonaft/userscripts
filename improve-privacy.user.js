@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.25
+// @version 0.26
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -36,7 +36,7 @@ const cleanup = node => {
     if (!href) return true;
 
     const url = new URL(href);
-    [...url.searchParams.keys()]
+    Array.from(url.searchParams.keys())
       .filter(k => k.startsWith('utm_') || k === 'notification_referrer_id' || k === 'redir_token')
       .forEach(k => url.searchParams.delete(k));
     maybeUpdateUrl(node, url, href);
@@ -55,7 +55,7 @@ const cleanup = node => {
     const maps = href.startsWith?.('https://maps.app.goo.gl/');
     if (!youtube && !maps) return true;
 
-    [...url.searchParams.keys()]
+    Array.from(url.searchParams.keys())
       .filter(k => maps || !['index', 'list', 't', 'v'].includes(k))
       .forEach(k => url.searchParams.delete(k));
 
