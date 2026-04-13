@@ -2,13 +2,13 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.80
+// @version 0.81
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @grant GM_addStyle
 // ==/UserScript==
 
-// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com
+// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com, pervertium.com
 
 (_ => {
 'use strict';
@@ -1232,6 +1232,8 @@ const sites = {
     const topRated = 'top-rated';
     const ending = `${topRated}/${minDuration}/`;
 
+    document.cookie = 'kt_rt_theme=black';
+
     init({
       searchInputSelector: 'input[type="text"][placeholder="Search"], input[type="text"][name="q"]',
       searchFilter: query => [`search/${encodeURIComponent(query)}/${ending}`, {}],
@@ -1755,7 +1757,7 @@ const sites = {
       videoSelector: 'video.mgp_videoElement:not(.gifVideo)',
       playSelector: 'div.mgp_playIcon, div.mgp_bigPlay, div.mgp_playbackBtn, mgp_smallPlay',
       fullscreenSelector: 'div.mgp_fullscreenIcon, div[data-text="Enter Fullscreen"], div[data-text="Exit fullscreen"]',
-      thumbnailSelector: 'div.video-box',
+      thumbnailSelector: 'a.video-box-image',
       durationSelector: 'div.video-duration',
       isUnwantedDuration: text => timeToSeconds(text) < MIN_DURATION_MINS * 60,
       isVideoUrl: href => href.includes('/watch/'),
