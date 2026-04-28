@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Turn Embedded YouTube Videos Into Redirects
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/disable-embedded-youtube-videos.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -30,8 +30,18 @@ subscribeOnChanges(document.body, 'iframe[src^="https://youtube.com/"], iframe[s
     image.style.height = 'auto';
     image.style.display = 'block';
 
+    const url = new URL(REDIRECT);
+    url.pathname = '/watch';
+    url.searchParams.set('v', videoId);
+    for (const i of ['index', 'list', 't']) {
+      const value = src.searchParams.get(i);
+      if (value) {
+        url.searchParams.set(i, value);
+      }
+    }
+
     const link = document.createElement('a');
-    link.href = `${REDIRECT}/${videoId}`;
+    link.href = url;
     link.textContent = `\u25B6 ${link.href}`;
     link.target = '_blank';
     link.style.width = '100%';
