@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Turn Embedded YouTube Videos Into Redirects
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.6
+// @version 0.7
 // @downloadURL https://userscripts.codonaft.com/disable-embedded-youtube-videos.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -10,7 +10,8 @@
 'use strict';
 
 //const REDIRECT = 'https://redirect.invidious.io';
-const REDIRECT = 'https://inv.nadeko.net';
+//const REDIRECT = 'https://inv.nadeko.net';
+const REDIRECT = 'https://invidious.smesh.lol';
 const PROXY = pickRandom(['imgproxy.nostu.be/insecure/f:webp/rs:fill::360/plain/', 'imgproxy.nosotros.app/_/feed_img/plain/', 'wsrv.nl/?url=']);
 
 const imageURL = url => {

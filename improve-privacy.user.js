@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.26
+// @version 0.27
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -32,8 +32,12 @@ const cleanup = node => {
 
   try {
     if (!node.matches(links)) return true;
-    const href = node.href;
+    let href = node.href;
     if (!href) return true;
+
+    if href.startsWith('/') {
+        href = `${window.location.origin}${href}`;
+    }
 
     const url = new URL(href);
     Array.from(url.searchParams.keys())

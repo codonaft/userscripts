@@ -888,6 +888,7 @@ const sites = {
   },
 
   'pmvtube.com': _ => {
+    // FIXME: best newest popular buttons
     init({
       searchInputSelector: 'input#s[type="text"], input[type="text"][name="s"]',
       searchFilter: query => ['search', { s: query, filter: 'longest' }],
