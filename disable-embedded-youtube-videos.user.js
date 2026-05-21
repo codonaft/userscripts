@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Turn Embedded YouTube Videos Into Redirects
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.7
+// @version 0.8
 // @downloadURL https://userscripts.codonaft.com/disable-embedded-youtube-videos.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -22,7 +22,7 @@ const imageURL = url => {
 subscribeOnChanges(document.body, 'iframe[src^="https://youtube.com/"], iframe[src^="https://youtube-nocookie.com/"], iframe[src^="https://www.youtube.com/"], iframe[src^="https://www.youtube-nocookie.com/"]', node => {
   const src = new URL(node.src);
   const videoId = src.searchParams.get('v') || src.pathname.split('/embed/')[1];
-  if (videoId) {
+  if (videoId && node.parentNode) {
     console.log(`detected embedded video ${videoId}`);
 
     const image = document.createElement('img');
