@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Improve Privacy
-// @version 0.28
+// @version 0.29
 // @downloadURL https://userscripts.codonaft.com/improve-privacy.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -33,7 +33,7 @@ const cleanup = node => {
   try {
     if (!node.matches(links)) return true;
     let href = node.href;
-    if (!href) return true;
+    if (!href?.startsWith) return true;
 
     if (href.startsWith('/')) {
         href = `${window.location.origin}${href}`;
@@ -55,8 +55,8 @@ const cleanup = node => {
       return;
     }
 
-    const youtube = href.startsWith?.('https://www.youtube.com/watch?') || href.startsWith?.('https://youtu.be/');
-    const maps = href.startsWith?.('https://maps.app.goo.gl/');
+    const youtube = href.startsWith('https://www.youtube.com/watch?') || href.startsWith('https://youtu.be/');
+    const maps = href.startsWith('https://maps.app.goo.gl/');
     if (!youtube && !maps) return true;
 
     Array.from(url.searchParams.keys())
