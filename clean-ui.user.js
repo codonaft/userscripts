@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name Clean UI
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/clean-ui.user.js
 // @require https://userscripts.codonaft.com/utils.js
-// @match https://*.youtube.com/*
+// @match https://*.invidious.*/*
 // @match https://*.telegram.org/*
+// @match https://*.youtube.com/*
 // ==/UserScript==
 
 (_ => {
@@ -27,6 +28,16 @@ if (h.endsWith('youtube.com')) {
   subscribeOnChanges(document.body, 'img.ytd-yoodle-renderer', (node, observer) => {
     observer.disconnect();
     hide(node);
+    return false;
+  });
+}
+
+if (h.includes('invidious')) {
+  subscribeOnChanges(document.body, 'div.h-box', (node, observer) => {
+    if (node.textContent?.includes?.('Play next by default')) {
+      observer.disconnect();
+      hide(node);
+    }
     return false;
   });
 }
