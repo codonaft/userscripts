@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Disable YouTube Channel Intro
 // @icon https://external-content.duckduckgo.com/ip3/youtube.com.ico
-// @version 0.17
+// @version 0.18
 // @downloadURL https://userscripts.codonaft.com/disable-youtube-channel-intro.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @exclude https://www.youtube.com/watch?*
@@ -18,7 +18,7 @@ subscribeOnChanges(document.body, 'div#c4-player video, button.ytp-play-button[d
   node.click();
 
   const div = node.closest('div.html5-video-player');
-  const videoId = div?.querySelector('a.ytp-title-link')?.getAttribute('href')?.split('?v=')[1];
+  const videoId = div?.querySelector('a.ytp-title-link[href]')?.getAttribute('href')?.split('?v=')[1];
   if (videoId) {
     const image = document.createElement('img');
     image.src = `https://i.ytimg.com/vi_webp/${videoId}/maxresdefault.webp`;
