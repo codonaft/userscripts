@@ -1,11 +1,8 @@
 // ==UserScript==
 // @name Clean UI
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/clean-ui.user.js
 // @require https://userscripts.codonaft.com/utils.js
-// @match https://*.invidious.*/*
-// @match https://*.telegram.org/*
-// @match https://*.youtube.com/*
 // ==/UserScript==
 
 (_ => {
@@ -32,7 +29,7 @@ if (h.endsWith('youtube.com')) {
   });
 }
 
-if (h.includes('invidious')) {
+if (document.head.querySelector('link[title="Invidious"]')) {
   subscribeOnChanges(document.body, 'div.h-box', (node, observer) => {
     if (node.textContent?.includes?.('Play next by default')) {
       observer.disconnect();

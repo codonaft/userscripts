@@ -8,7 +8,7 @@
 // @grant GM_addStyle
 // ==/UserScript==
 
-// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com, pervertium.com, familyporner.com, prostasex.org
+// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com, pervertium.com, familyporner.com, prostasex.org, analdin.xxx
 
 (_ => {
 'use strict';
