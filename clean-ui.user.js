@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Clean UI
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/clean-ui.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -17,6 +17,18 @@ const hide = node => node.style.display = 'none';
 if (h.endsWith('telegram.org')) {
   subscribeOnChanges(document.body, 'div.badge-gray', (node, _observer) => {
     hide(node);
+    return false;
+  });
+}
+
+if (h.endsWith('yakihonne.com')) {
+  subscribeOnChanges(document.body, 'button.btn', (node, _observer) => {
+    if (node.textContent.includes('Share profile')) {
+      const p = node.closest('div.fit-container');
+      if (p) {
+        hide(p);
+      }
+    }
     return false;
   });
 }
