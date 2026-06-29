@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name Improve Adult Experience
-// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, youporn.com, рус-порно.tv
+// @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornhat.com, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, privatehomeclips.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, xxxdan.com, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.83
+// @version 0.84
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @grant GM_addStyle
 // ==/UserScript==
 
-// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com, pervertium.com, familyporner.com, prostasex.org, analdin.xxx
+// TODO: cumlouder.com, tubeon.com, xtits.xxx, eporner.com, pervclips.com, bigbumfun.com, momvids.com, zbporn.com, ok.xxx / perfectgirls.xxx, tubev.sex, youjizz.com, empflix.com, babestube.com, pornwhite.com, pornomira.net, videosection.com, upornia.com, free.brazzers.com, hdsex.org, gay0day.com, collectionofbestporn.com, pissjapantv.com, pervertslut.com, luxuretv.com, 4kporn.xxx, minuporno.com, prndb.net, familyporn.tv, pornoclown.top / pornoclown.com, pervertium.com, familyporner.com, prostasex.org, analdin.xxx, amateur8.com, fapality.com, jizzex.com
 
 (_ => {
 'use strict';
@@ -929,6 +929,15 @@ const sites = {
     });
   },
 
+  'pornhat.com': _ => {
+    document.cookie = 'kt_rt_theme=dark';
+    init({
+      thumbnailSelector: 'div.thumb-bl',
+      durationSelector: 'ul.video-meta > :first-child',
+      isVideoUrl: href => href.includes('/video/'),
+    });
+  },
+
   'pornheed.com': _ => {
     const searchFilter = query => [`s/top-rated/all-time/all-tubes/all-words/long-duration/${query}/1`, {}];
     const thumbnailSelector = 'li.video-item';
@@ -1279,6 +1288,14 @@ const sites = {
     init({
       thumbnailSelector: 'div.item_cont',
       durationSelector: 'div.item_dur',
+      isVideoUrl: href => href.includes('/videos/'),
+    });
+  },
+
+  'privatehomeclips.com': _ => {
+    init({
+      thumbnailSelector: 'div.thumb',
+      durationSelector: 'div.thumb__duration',
       isVideoUrl: href => href.includes('/videos/'),
     });
   },
@@ -1745,6 +1762,13 @@ const sites = {
         if (!validLink(node) || isVideoUrl(node.href) || node.href.endsWith(topRated) || ['categories', 'history', 'models', 'recommended', 'tags'].find(i => node.href.endsWith(`/${i}`)) || node.closest('div.heading-sort')) return;
         node.href += topRated;
       },
+    });
+  },
+
+  'xxxdan.com': _ => {
+    init({
+      thumbnailSelector: 'a.video-card',
+      durationSelector: 'span.video-card__duration',
     });
   },
 
