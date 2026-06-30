@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Clean UI
-// @version 0.4
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/clean-ui.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // ==/UserScript==
@@ -23,8 +23,9 @@ if (h.endsWith('telegram.org')) {
 
 if (h.endsWith('yakihonne.com')) {
   subscribeOnChanges(document.body, 'button.btn', (node, _observer) => {
-    if (node.textContent.includes('Share profile')) {
-      const p = node.closest('div.fit-container');
+    const text = node.textContent;
+    if (text.includes('Support us') || text.includes('Share profile')) {
+      const p = node.closest('div.fit-container.fx-centered');
       if (p) {
         hide(p);
       }
