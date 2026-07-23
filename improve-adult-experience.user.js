@@ -2,7 +2,7 @@
 // @name Improve Adult Experience
 // @description Skip intros, set better default quality/duration filters, make unwanted video previews transparent, workaround load failures, make input more consistent across the websites, remove spammy elements. Usually affects every media player it can find, designed to be used on a separate browser profile. Supported websites: anysex.com, beeg.com, bingato.com, drtuber.com, hqporner.com, hdzog.tube, hypnotube.com, incestporno.vip, inporn.com, manysex.com, mat6tube.com, pmvhaven.com, pmvtube.com, porn00.tv, pornhat.com, pornheed.com, pornhits.com, pornhub.com, porno365.best, pornone.com, porntati.com, porntrex.com, pornxp.com, privatehomeclips.com, redtube.com, spankbang.com, taboodude.com, tnaflix.com, tube8.com, txxx.com, veporn.com, vxxx.com, whoreshub.com, xgroovy.com, xhamster.com, xnxx.com, xvideos.com, xxxbp.tv, xxxdan.com, youporn.com, рус-порно.tv
 // @icon https://external-content.duckduckgo.com/ip3/pornhub.com.ico
-// @version 0.84
+// @version 0.85
 // @downloadURL https://userscripts.codonaft.com/improve-adult-experience.user.js
 // @require https://userscripts.codonaft.com/utils.js
 // @grant GM_addStyle
@@ -1341,7 +1341,7 @@ const sites = {
       thumbnailSelector: 'div[data-testid="video-item"]',
       durationSelector: 'span[data-testid="video-item-length"], div[data-testid="video-item-length"]',
       isVideoUrl: href => href.includes('/video/'),
-      hideSelector: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper',
+      hideSelector: 'div[x-data="gifPage"], section.timeline, div.positions-wrapper, span.bg-surface-brand-primary.text-primary.absolute',
       onPlaybackStart: _ => {
         body.querySelector('button.vjs-control[title="Unmute"]')?.click();
         const cover = body.querySelector('div.play_cover');
