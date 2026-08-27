@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name Hacks for the cute metasearch engine https://github.com/mat-1/metasearch2
-// @version 0.11
+// @version 0.12
 // @downloadURL https://userscripts.codonaft.com/metasearch-hacks.user.js
 // @grant GM_addStyle
 // ==/UserScript==
@@ -21,7 +21,7 @@ if (!body) return;
 
 const redirectToSearxng = q => {
   const categories = params.get('tab') === 'images' ? 'images' : 'general';
-  const newParams = new URLSearchParams({ q, categories });
+  const newParams = new URLSearchParams({ q, categories, fast: '1' });
   window.location.replace(`https://codonaft.com/searxng#${newParams}`);
 };
 
