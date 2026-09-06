@@ -2,7 +2,7 @@
 // @name Redirect SearXNG On Failure
 // @description Redirect to a random SearXNG instance in case of error and empty result, improve instance selection with local statistics
 // @icon https://external-content.duckduckgo.com/ip3/searx.space.ico
-// @version 0.18
+// @version 0.19
 // @downloadURL https://userscripts.codonaft.com/redirect-searxng-on-failure.user.js
 // @grant GM.getValue
 // @grant GM_setValue
@@ -131,7 +131,7 @@ if (queryFromInput.length === 0 && form && queryInput) {
     url.host = 'codonaft.com';
     url.protocol = 'https:';
   }
-  url.pathname = '/searxng';
+  url.pathname = '/searxng.html';
   url.searchParams.set('fast', '0');
   if (queryFromInput.length > 0 && !url.searchParams.has('q')) {
     url.searchParams.set('q', queryFromInput);
