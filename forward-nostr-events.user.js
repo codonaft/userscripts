@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Forward Nostr Events
 // @description Your events and of those you interacted with
-// @version 0.1
+// @version 0.2
 // @downloadURL https://userscripts.codonaft.com/forward-nostr-events.user.js
 // @run-at document-start
 // @grant none
@@ -31,6 +31,8 @@ const pending = new Map();
 let forwardedEvents;
 let cachedEvents;
 let cachePersistedSecs = 0;
+
+let nostrClient = false;
 
 let myPubkey;
 
@@ -203,6 +205,7 @@ const handleOutgoing = (socket, message) => {
 
   if (type === 'REQ') {
     sockets.set(relay, socket);
+    nostrClient = !!window.nostr;
     return;
   }
 
@@ -321,8 +324,10 @@ Object.assign(window.WebSocket, NativeWebSocket);
 window.WebSocket.prototype = NativeWebSocket.prototype;
 
 window.addEventListener('beforeunload', (event) => {
-  console.log('save cached events');
-  localStorage.setItem(CACHED_KEY, JSON.stringify(cachedEvents));
+  if (nostrClient) {
+    console.log('save cached events');
+    localStorage.setItem(CACHED_KEY, JSON.stringify(cachedEvents));
+  }
 });
 
 try {
