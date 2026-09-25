@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Forward Nostr Events
 // @description Your events and of those you interacted with
-// @version 0.2
+// @version 0.3
 // @downloadURL https://userscripts.codonaft.com/forward-nostr-events.user.js
 // @run-at document-start
 // @grant none
@@ -144,6 +144,11 @@ const handleMessage = (message, socket) => {
     return;
   }
 
+  maybeInitStorage();
+  if (!nostrClient) {
+    return;
+  }
+
   const type = data[0];
 
   {
@@ -205,7 +210,6 @@ const handleOutgoing = (socket, message) => {
 
   if (type === 'REQ') {
     sockets.set(relay, socket);
-    nostrClient = !!window.nostr;
     return;
   }
 
@@ -226,6 +230,16 @@ const handleOutgoing = (socket, message) => {
   }, TIMEOUT);
 
   pending.set(event.id, timer);
+};
+
+const maybeInitStorage = _ => {
+  if (!nostrClient) {
+    nostrClient = !!window.nostr;
+    if (nostrClient) {
+      loadForwardedEvents();
+      loadCachedEvents();
+    }
+  }
 };
 
 const loadForwardedEvents = _ => {
@@ -297,9 +311,6 @@ const cacheEvents = (ids, event) => {
 const normalize = url => String(url).replace(/\/+$/, '');
 
 const now = _ => Math.floor(Date.now() / MS_IN_SEC);
-
-loadForwardedEvents();
-loadCachedEvents();
 
 const NativeWebSocket = window.WebSocket;
 
