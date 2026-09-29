@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Forward Nostr Events
 // @description Your events and of those you interacted with
-// @version 0.3
+// @version 0.4
 // @downloadURL https://userscripts.codonaft.com/forward-nostr-events.user.js
 // @run-at document-start
 // @grant none
@@ -27,6 +27,7 @@ const MS_IN_SEC = 1000;
 
 const sockets = new Map();
 const pending = new Map();
+const bannedPubkeys = new Map();
 
 let forwardedEvents;
 let cachedEvents;
@@ -192,7 +193,7 @@ const handleMessage = (message, socket) => {
   }
 };
 
-const handleOutgoing = (socket, message) => {
+const handleOutgoing = async (socket, message) => {
   let data;
 
   try {
@@ -214,22 +215,60 @@ const handleOutgoing = (socket, message) => {
   }
 
   const event = data[1];
-  if (type !== 'EVENT' || !KINDS.includes(event?.kind)) {
+  if (type !== 'EVENT') {
+    return;
+  }
+
+  const { id, pubkey, kind } = event;
+  if (!KINDS.includes(kind)) {
+    return;
+  }
+
+  if (!bannedPubkeys.has(pubkey)) {
+    try {
+      const wot = await fetch('https://api.brainstorm.world/stats/pubkey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pubkey })
+      });
+      console.log('wot', wot);
+      const { rank, followers, follows, reporters, muters } = wot;
+
+      if (followers === 0 || follows === 0) {
+        console.log(`${pubkey} is a new account?`);
+        bannedPubkeys.set(pubkey, true);
+        return;
+      }
+
+      if (muters - followers > 10) {
+        console.log(`${pubkey} is a spammer?`);
+        bannedPubkeys.set(pubkey, true);
+        return;
+      }
+    } catch(e) {
+      console.error(e);
+    }
+
+    bannedPubkeys.set(pubkey, false);
+  }
+
+  if (bannedPubkeys.get(pubkey)) {
+    console.log(`ignoring events from ${pubkey}`);
     return;
   }
 
   console.log('detected outgoing event');
-  cacheEvents([event.id], event);
+  cacheEvents([id], event);
 
-  if (pending.has(event.id)) {
+  if (pending.has(id)) {
     return;
   }
 
   const timer = setTimeout(_ => {
-    pending.delete(event.id);
+    pending.delete(id);
   }, TIMEOUT);
 
-  pending.set(event.id, timer);
+  pending.set(id, timer);
 };
 
 const maybeInitStorage = _ => {
