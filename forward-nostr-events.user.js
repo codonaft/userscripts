@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Forward Nostr Events
 // @description Your events and of those you interacted with
-// @version 0.5
+// @version 0.6
 // @downloadURL https://userscripts.codonaft.com/forward-nostr-events.user.js
 // @run-at document-start
 // @grant none
@@ -28,6 +28,7 @@ const MS_IN_SEC = 1000;
 const sockets = new Map();
 const pending = new Map();
 const bannedPubkeys = new Map();
+const brainstormResponses = new Map();
 
 let forwardedEvents;
 let cachedEvents;
@@ -224,14 +225,16 @@ const handleOutgoing = async (socket, message) => {
     return;
   }
 
-  if (!bannedPubkeys.has(pubkey)) {
+  if (pubkey !== myPubkey && !bannedPubkeys.has(pubkey) && !brainstormResponses.has(pubkey)) {
     try {
-      const response = await fetch('https://api.brainstorm.world/stats/pubkey', {
+      const response = fetch('https://api.brainstorm.world/stats/pubkey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pubkey })
       });
-      const wot = await response.json();
+      brainstormResponses.set(pubkey, response);
+      const wot = await (await response).json();
+      brainstormResponses.delete(pubkey);
       console.log('wot', wot);
       const { rank, followers, follows, reporters, muters } = wot;
 
@@ -251,6 +254,14 @@ const handleOutgoing = async (socket, message) => {
     }
 
     bannedPubkeys.set(pubkey, false);
+  }
+
+  try {
+    if (brainstormResponses.has(pubkey)) {
+      await brainstormResponses.get(pubkey);
+    }
+  } catch(e) {
+    console.error(e);
   }
 
   if (bannedPubkeys.get(pubkey)) {
