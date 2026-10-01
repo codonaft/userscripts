@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name Forward Nostr Events
 // @description Your events and of those you interacted with
-// @version 0.4
+// @version 0.5
 // @downloadURL https://userscripts.codonaft.com/forward-nostr-events.user.js
 // @run-at document-start
 // @grant none
@@ -226,11 +226,12 @@ const handleOutgoing = async (socket, message) => {
 
   if (!bannedPubkeys.has(pubkey)) {
     try {
-      const wot = await fetch('https://api.brainstorm.world/stats/pubkey', {
+      const response = await fetch('https://api.brainstorm.world/stats/pubkey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pubkey })
       });
+      const wot = await response.json();
       console.log('wot', wot);
       const { rank, followers, follows, reporters, muters } = wot;
 
